@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::models::{ChatCompletionRequest, ChatMessage};
 use crate::provider::{Provider, ProviderError};
 
+/// Provider implementation backed by an Ollama HTTP server.
 pub struct OllamaProvider {
     client: Client,
     base_url: String,
@@ -55,11 +56,7 @@ struct OllamaResponse {
 
 #[async_trait]
 impl Provider for OllamaProvider {
-    async fn chat(
-        &self,
-        request: &ChatCompletionRequest,
-    ) -> Result<ChatMessage, ProviderError> {
-
+    async fn chat(&self, request: &ChatCompletionRequest) -> Result<ChatMessage, ProviderError> {
         let ollama_request = OllamaRequest {
             model: request.model.clone(),
 
@@ -75,10 +72,7 @@ impl Provider for OllamaProvider {
             stream: false,
         };
 
-        let url = format!(
-            "{}/api/chat",
-            self.base_url.trim_end_matches('/')
-        );
+        let url = format!("{}/api/chat", self.base_url.trim_end_matches('/'));
 
         let response = self
             .client
@@ -92,10 +86,8 @@ impl Provider for OllamaProvider {
             return Err(ProviderError::Internal);
         }
 
-        let response: OllamaResponse = response
-            .json()
-            .await
-            .map_err(|_| ProviderError::Internal)?;
+        let response: OllamaResponse =
+            response.json().await.map_err(|_| ProviderError::Internal)?;
 
         Ok(ChatMessage {
             role: response.message.role,

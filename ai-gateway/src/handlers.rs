@@ -1,29 +1,22 @@
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
-};
+use axum::{Json, extract::State, http::StatusCode};
 
 use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
-    models::{
-        ChatCompletionRequest,
-        ChatCompletionResponse,
-        Choice,
-    },
+    models::{ChatCompletionRequest, ChatCompletionResponse, Choice},
     routing::resolve_model,
     state::AppState,
 };
 
+/// Handles OpenAI-compatible chat completion requests.
+///
+/// The requested logical model or category is resolved before the request is
+/// forwarded to the selected provider.
 pub async fn chat_completions(
     State(state): State<Arc<AppState>>,
     Json(request): Json<ChatCompletionRequest>,
-) -> Result<
-    Json<ChatCompletionResponse>,
-    (StatusCode, String),
-> {
+) -> Result<Json<ChatCompletionResponse>, (StatusCode, String)> {
     tracing::info!(
         model = %request.model,
         messages = request.messages.len(),
@@ -38,17 +31,8 @@ pub async fn chat_completions(
     //
     // The resolver determines the logical model,
     // provider, and concrete provider model.
-    let resolved = resolve_model(
-        &request.model,
-        &state.models,
-        &state.categories,
-    )
-    .map_err(|error| {
-        (
-            StatusCode::BAD_REQUEST,
-            error,
-        )
-    })?;
+    let resolved = resolve_model(&request.model, &state.models, &state.categories)
+        .map_err(|error| (StatusCode::BAD_REQUEST, error))?;
 
     tracing::info!(
         requested_model = %resolved.requested_name,
@@ -59,18 +43,12 @@ pub async fn chat_completions(
     );
 
     // Find the provider implementation.
-    let provider = state
-        .providers
-        .get(&resolved.provider)
-        .ok_or_else(|| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!(
-                    "Configured provider not found: {}",
-                    resolved.provider
-                ),
-            )
-        })?;
+    let provider = state.providers.get(&resolved.provider).ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Configured provider not found: {}", resolved.provider),
+        )
+    })?;
 
     // Create the provider-specific request.
     //
@@ -85,27 +63,21 @@ pub async fn chat_completions(
     };
 
     // Send the request to the selected provider.
-    let message = provider
-        .chat(&provider_request)
-        .await
-        .map_err(|error| {
-            tracing::error!(
-                ?error,
-                requested_model = %resolved.requested_name,
-                logical_model = %resolved.logical_model,
-                provider = %resolved.provider,
-                provider_model = %resolved.provider_model,
-                "Provider request failed"
-            );
+    let message = provider.chat(&provider_request).await.map_err(|error| {
+        tracing::error!(
+            ?error,
+            requested_model = %resolved.requested_name,
+            logical_model = %resolved.logical_model,
+            provider = %resolved.provider,
+            provider_model = %resolved.provider_model,
+            "Provider request failed"
+        );
 
-            (
-                StatusCode::BAD_GATEWAY,
-                format!(
-                    "Provider request failed: {:?}",
-                    error
-                ),
-            )
-        })?;
+        (
+            StatusCode::BAD_GATEWAY,
+            format!("Provider request failed: {:?}", error),
+        )
+    })?;
 
     // Return an OpenAI-compatible response.
     //
@@ -115,13 +87,11 @@ pub async fn chat_completions(
         id: format!("chatcmpl-{}", Uuid::new_v4()),
         object: "chat.completion".to_string(),
         model: request.model,
-        choices: vec![
-            Choice {
-                index: 0,
-                message,
-                finish_reason: "stop".to_string(),
-            }
-        ],
+        choices: vec![Choice {
+            index: 0,
+            message,
+            finish_reason: "stop".to_string(),
+        }],
     };
 
     Ok(Json(response))
