@@ -1,0 +1,22 @@
+[providers.mock]
+type = "mock"
+
+[providers.ollama]
+type = "ollama"
+base_url = "http://localhost:11434"
+
+
+[models.qwen-small]
+provider = "ollama"
+model = "qwen2.5:1.5b"
+
+[models.qwen-coder]
+provider = "ollama"
+model = "qwen2.5-coder"
+
+
+[categories.chat]
+models = ["qwen-small"]
+
+[categories.coding]
+models = ["qwen-coder"]

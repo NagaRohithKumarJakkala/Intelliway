@@ -1,22 +1,22 @@
-mod handlers;
-mod models;
-mod provider;
-mod providers;
-mod registry;
-mod state;
-
 use axum::{
     routing::{get, post},
     Router,
 };
 
-use std::net::SocketAddr;
-use std::sync::Arc;
+use ai_gateway::{
+    config::{Config, ProviderConfig},
+    handlers,
+    providers::mock::MockProvider,
+    providers::ollama::OllamaProvider,
+    registry::ProviderRegistry,
+    state::AppState,
+};
 
-use providers::mock::MockProvider;
-use providers::ollama::OllamaProvider;
-use registry::ProviderRegistry;
-use state::AppState;
+use std::{
+    fs,
+    net::SocketAddr,
+    sync::Arc,
+};
 
 #[tokio::main]
 async fn main() {
@@ -24,26 +24,54 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // --------------------------------------------------
+    // Load configuration
+    // --------------------------------------------------
+
+    let config_path =
+        format!("{}/config.toml", env!("CARGO_MANIFEST_DIR"));
+
+    let config_text = fs::read_to_string(&config_path)
+        .expect("Failed to read config.toml");
+
+    let config: Config = toml::from_str(&config_text)
+        .expect("Failed to parse config.toml");
+
+    // --------------------------------------------------
     // Create provider registry
     // --------------------------------------------------
 
     let mut registry = ProviderRegistry::new();
 
-    // Register Mock provider
-    registry.register(
-        "mock",
-        Arc::new(MockProvider),
-    );
+    for (name, provider_config) in config.providers {
+        match provider_config {
+            ProviderConfig::Mock => {
+                tracing::info!(
+                    provider = %name,
+                    "Registering mock provider"
+                );
 
-    // Register Ollama provider
-    registry.register(
-        "ollama",
-        Arc::new(
-            OllamaProvider::new(
-                "http://localhost:11434".to_string()
-            )
-        ),
-    );
+                registry.register(
+                    name,
+                    Arc::new(MockProvider),
+                );
+            }
+
+            ProviderConfig::Ollama { base_url } => {
+                tracing::info!(
+                    provider = %name,
+                    base_url = %base_url,
+                    "Registering Ollama provider"
+                );
+
+                registry.register(
+                    name,
+                    Arc::new(
+                        OllamaProvider::new(base_url)
+                    ),
+                );
+            }
+        }
+    }
 
     // --------------------------------------------------
     // Create application state
@@ -51,6 +79,8 @@ async fn main() {
 
     let state = Arc::new(AppState {
         providers: Arc::new(registry),
+        models: Arc::new(config.models),
+        categories: Arc::new(config.categories),
     });
 
     // --------------------------------------------------
@@ -58,19 +88,14 @@ async fn main() {
     // --------------------------------------------------
 
     let app = Router::new()
-        // Health check
         .route(
             "/health",
             get(health),
         )
-
-        // OpenAI-compatible chat endpoint
         .route(
             "/v1/chat/completions",
             post(handlers::chat_completions),
         )
-
-        // Make provider registry available to handlers
         .with_state(state);
 
     // --------------------------------------------------

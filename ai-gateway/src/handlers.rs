@@ -1,10 +1,10 @@
 use axum::{
     extract::State,
+    http::StatusCode,
     Json,
 };
 
 use std::sync::Arc;
-
 use uuid::Uuid;
 
 use crate::{
@@ -13,59 +13,108 @@ use crate::{
         ChatCompletionResponse,
         Choice,
     },
+    routing::resolve_model,
     state::AppState,
 };
 
 pub async fn chat_completions(
     State(state): State<Arc<AppState>>,
     Json(request): Json<ChatCompletionRequest>,
-) -> Json<ChatCompletionResponse> {
-
+) -> Result<
+    Json<ChatCompletionResponse>,
+    (StatusCode, String),
+> {
     tracing::info!(
         model = %request.model,
         messages = request.messages.len(),
         "received chat completion request"
     );
 
-    // Split "provider/model"
-    let (provider_name, model_name) = match request.model.split_once('/') {
-        Some((provider, model)) => (
-            provider.to_string(),
-            model.to_string(),
-        ),
+    // Resolve the requested model name.
+    //
+    // The request can contain either:
+    //   - a logical model, e.g. "qwen-small"
+    //   - a category, e.g. "chat"
+    //
+    // The resolver determines the logical model,
+    // provider, and concrete provider model.
+    let resolved = resolve_model(
+        &request.model,
+        &state.models,
+        &state.categories,
+    )
+    .map_err(|error| {
+        (
+            StatusCode::BAD_REQUEST,
+            error,
+        )
+    })?;
 
-        None => (
-            "mock".to_string(),
-            request.model.clone(),
-        ),
-    };
+    tracing::info!(
+        requested_model = %resolved.requested_name,
+        logical_model = %resolved.logical_model,
+        provider = %resolved.provider,
+        provider_model = %resolved.provider_model,
+        "model resolved"
+    );
 
-    // Find provider
+    // Find the provider implementation.
     let provider = state
         .providers
-        .get(&provider_name)
-        .expect("provider not found");
+        .get(&resolved.provider)
+        .ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!(
+                    "Configured provider not found: {}",
+                    resolved.provider
+                ),
+            )
+        })?;
 
-    // Create a new request with only the model name.
+    // Create the provider-specific request.
+    //
+    // The provider receives the actual model name,
+    // while the client only knows the logical model/category.
     let provider_request = ChatCompletionRequest {
-        model: model_name.clone(),
+        model: resolved.provider_model.clone(),
         messages: request.messages,
         temperature: request.temperature,
         max_tokens: request.max_tokens,
         stream: request.stream,
     };
 
-    // Send request to provider
+    // Send the request to the selected provider.
     let message = provider
         .chat(&provider_request)
         .await
-        .expect("provider request failed");
+        .map_err(|error| {
+            tracing::error!(
+                ?error,
+                requested_model = %resolved.requested_name,
+                logical_model = %resolved.logical_model,
+                provider = %resolved.provider,
+                provider_model = %resolved.provider_model,
+                "Provider request failed"
+            );
 
+            (
+                StatusCode::BAD_GATEWAY,
+                format!(
+                    "Provider request failed: {:?}",
+                    error
+                ),
+            )
+        })?;
+
+    // Return an OpenAI-compatible response.
+    //
+    // We return the model name requested by the client,
+    // rather than exposing the provider-specific model.
     let response = ChatCompletionResponse {
         id: format!("chatcmpl-{}", Uuid::new_v4()),
         object: "chat.completion".to_string(),
-        model: model_name,
-
+        model: request.model,
         choices: vec![
             Choice {
                 index: 0,
@@ -75,5 +124,5 @@ pub async fn chat_completions(
         ],
     };
 
-    Json(response)
+    Ok(Json(response))
 }
