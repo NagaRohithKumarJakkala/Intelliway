@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use crate::provider::Provider;
+use crate::registry::ProviderRegistry;
 
 pub struct AppState {
-    pub provider: Arc<dyn Provider>,
+    pub providers: Arc<ProviderRegistry>,
 }
