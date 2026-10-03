@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::{test_categories, test_models};
-use ai_gateway::{config::CategoryConfig, routing::resolve_model};
+use intelliway_gateway::{config::CategoryConfig, routing::resolve_model};
 
 #[test]
 fn resolves_category() {

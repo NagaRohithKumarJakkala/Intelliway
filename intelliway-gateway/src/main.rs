@@ -3,7 +3,7 @@ use axum::{
     routing::{get, post},
 };
 
-use ai_gateway::{
+use intelliway_gateway::{
     config::{Config, ProviderConfig},
     handlers,
     providers::mock::MockProvider,
