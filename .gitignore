@@ -1,1 +1,3 @@
 ai-gateway/target
+gateway/.env
+gateway/requests.jsonl
