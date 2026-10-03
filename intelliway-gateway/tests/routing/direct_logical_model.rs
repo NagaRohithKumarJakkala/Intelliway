@@ -1,5 +1,5 @@
 use super::{test_categories, test_models};
-use ai_gateway::routing::resolve_model;
+use intelliway_gateway::routing::resolve_model;
 
 #[test]
 fn resolves_direct_logical_model() {

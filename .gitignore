@@ -1,1 +1,2 @@
-ai-gateway/target
+target/
+.env

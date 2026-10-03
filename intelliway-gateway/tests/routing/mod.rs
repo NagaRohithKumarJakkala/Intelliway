@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ai_gateway::{
+use intelliway_gateway::{
     config::{CategoryConfig, ModelConfig},
     routing::resolve_model,
 };
