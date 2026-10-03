@@ -1,0 +1,32 @@
+model_list:
+
+  # -----------------------------
+  # Local Ollama model
+  # -----------------------------
+  - model_name: local-general
+    litellm_params:
+      model: ollama/qwen2.5:1.5b
+      api_base: http://127.0.0.1:11434
+
+  # -----------------------------
+  # External OpenAI model
+  # -----------------------------
+  - model_name: external-general
+    litellm_params:
+      model: gemini/gemini-3.8-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  # -----------------------------
+  # Deterministic mock provider
+  # -----------------------------
+  # - model_name: mock-general
+  #   litellm_params:
+  #     model: openai/mock-model
+  #     api_base: http://127.0.0.1:9000/v1
+  #     api_key: mock-key
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+router_settings:
+  routing_strategy: simple-shuffle
