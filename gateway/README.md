@@ -99,6 +99,8 @@ gateway/
 - any required external provider credentials in the configured provider stack
 - a valid environment for running the app and tests
 
+This project keeps only direct dependencies in `pyproject.toml`; transitive dependencies are resolved and pinned in `uv.lock` by `uv`.
+
 ## Environment setup
 
 Copy `.env.example` if present and set values for your local environment.
