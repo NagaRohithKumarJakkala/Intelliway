@@ -7,7 +7,11 @@ from fastapi import FastAPI, HTTPException
 
 from .ledger import record_request
 from .models import ChatCompletionRequest
-from .routing import fallback_model, route_request
+from .routing import (
+    canonical_auto_preset,
+    fallback_model,
+    route_request,
+)
 from .upstream import send_to_litellm
 
 
@@ -85,8 +89,11 @@ async def chat_completion(
     # Only automatic routing is allowed to use fallback.
     models_to_try = [initial_model]
 
-    if request.model == "auto":
-        fallback = fallback_model(initial_model)
+    if canonical_auto_preset(request.model) is not None:
+        fallback = fallback_model(
+            initial_model,
+            request.model,
+        )
 
         if fallback is not None:
             models_to_try.append(fallback)

@@ -1,4 +1,5 @@
 
+import httpx
 from fastapi.testclient import TestClient
 
 from gateway import main
@@ -124,3 +125,40 @@ def test_streaming_is_rejected_before_provider_call(monkeypatch):
 
     assert response.status_code == 422
     assert provider_calls == []
+
+
+def test_auto_local_does_not_fall_back_to_external_model(monkeypatch):
+    provider_calls = []
+
+    async def failing_send_to_litellm(**kwargs):
+        provider_calls.append(kwargs["model"])
+        raise httpx.ReadTimeout("local provider unavailable")
+
+    monkeypatch.setattr(
+        main,
+        "send_to_litellm",
+        failing_send_to_litellm,
+    )
+    monkeypatch.setattr(
+        main,
+        "authenticate_project",
+        lambda authorization: None,
+    )
+
+    client = TestClient(main.app)
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "auto-local",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Tell me a joke",
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 502
+    assert provider_calls == ["local-general"]

@@ -8,6 +8,18 @@ EXPLICIT_MODELS = {
     "external-general",
 }
 
+AUTO_ROUTING_PRESETS = {
+    "auto-cost",
+    "auto-quality",
+    "auto-balanced",
+    "auto-local",
+}
+
+AUTO_MODEL_ALIASES = {
+    "auto": "auto-balanced",
+    **{preset: preset for preset in AUTO_ROUTING_PRESETS},
+}
+
 CODING_KEYWORDS = {
     "code",
     "python",
@@ -24,8 +36,14 @@ CODING_KEYWORDS = {
 }
 
 
+def canonical_auto_preset(requested_model: str) -> str | None:
+    """Return the canonical automatic preset, or None for explicit models."""
+
+    return AUTO_MODEL_ALIASES.get(requested_model)
+
+
 def route_request(request: ChatCompletionRequest) -> str:
-    """Honor explicit model requests; route automatically only for 'auto'."""
+    """Honor explicit models and apply the current mock automatic policies."""
 
     requested_model = request.model
 
@@ -33,13 +51,19 @@ def route_request(request: ChatCompletionRequest) -> str:
     if requested_model in EXPLICIT_MODELS:
         return requested_model
 
+    preset = canonical_auto_preset(requested_model)
+
     # Unknown aliases must not silently route to another model.
-    if requested_model != "auto":
+    if preset is None:
         raise ValueError(
             f"Unknown model alias: {requested_model}"
         )
 
-    # Automatic routing is used only when model='auto'.
+    if preset == "auto-local":
+        return "local-general"
+
+    # Cost, quality, and balanced policies share this deterministic mock
+    # heuristic until real model-selection algorithms are available.
     text = " ".join(
         message.content.lower()
         for message in request.messages
@@ -52,10 +76,16 @@ def route_request(request: ChatCompletionRequest) -> str:
     return "external-general"
 
 
-def fallback_model(selected_model: str) -> str | None:
-    """Return the permitted fallback for automatic routing."""
+def fallback_model(
+    selected_model: str,
+    requested_model: str = "auto",
+) -> str | None:
+    """Return the permitted fallback for the requested automatic preset."""
 
-    if selected_model == "external-general":
+    if (
+        canonical_auto_preset(requested_model) != "auto-local"
+        and selected_model == "external-general"
+    ):
         return "local-general"
 
     return None

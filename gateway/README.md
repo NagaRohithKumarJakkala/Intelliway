@@ -17,17 +17,28 @@ The current implementation is intentionally small and deterministic. It does not
 
 ## Current model-routing logic
 
-The app uses two logical models:
+The app uses two explicit logical models and four automatic routing presets:
 
 - `local-general` -> local/LiteLLM-backed Ollama route
 - `external-general` -> external/LiteLLM-backed provider route
+- `auto-cost` -> automatic routing with cost as the future policy priority
+- `auto-quality` -> automatic routing with quality as the future policy priority
+- `auto-balanced` -> automatic routing with balanced priorities
+- `auto-local` -> local-only automatic routing
+
+`auto` is retained as a compatibility alias for `auto-balanced`.
 
 Routing behavior:
 
 - If `model` is explicitly set to `local-general` or `external-general`, that explicit value is used.
-- If `model` is `auto`, the gateway inspects the user message text for coding keywords such as `python`, `code`, `debug`, `function`, `rust`, `javascript`, and `compile`.
-- Coding-heavy prompts route to `local-general`.
-- Other prompts route to `external-general`.
+- For now, `auto-cost`, `auto-quality`, and `auto-balanced` share the same
+  deterministic mock heuristic: the gateway inspects user message text for
+  coding keywords such as `python`, `code`, `debug`, `function`, `rust`,
+  `javascript`, and `compile`.
+- Coding-heavy prompts route to `local-general`; other prompts route to
+  `external-general`.
+- `auto-local` always routes to `local-general`, regardless of message
+  content.
 - Unknown model aliases raise a validation error instead of silently falling back to another provider.
 
 ## Current request validation
@@ -43,12 +54,14 @@ The request model is defined in `gateway/models.py` and enforces:
 
 ## Fallback and failure handling
 
-The gateway tries the selected model and, for `auto` routing only, may also try the permitted fallback model.
+The gateway tries the selected model and, for automatic routing presets, may
+also try the permitted fallback model.
 
 Fallback behavior in the current code is limited to:
 
 - `external-general` -> `local-general`
 - only for retryable upstream failures such as timeout, transport error, HTTP `429`, or HTTP `5xx`
+- `auto-local` never falls back to an external model; it remains local-only
 
 Permanent failures and non-retryable errors stop the attempt loop without silently retrying forever.
 
