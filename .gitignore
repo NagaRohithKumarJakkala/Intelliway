@@ -2,3 +2,4 @@ __pycache__/
 requests.jsonl
 .env
 graphify-out/
+.worktrees/
