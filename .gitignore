@@ -1,4 +1,4 @@
-gateway/.env
-gateway/requests.jsonl
+__pycache__/
+requests.jsonl
 target/
 .env
