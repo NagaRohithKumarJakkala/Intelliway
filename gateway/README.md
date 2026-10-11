@@ -1,157 +1,130 @@
 # AI Gateway
 
-An OpenAI-compatible AI Gateway providing a unified interface to multiple LLM providers.
+This repository contains a Python FastAPI gateway sitting in front of LiteLLM. The gateway exposes an OpenAI-style chat-completions endpoint, validates request payloads, selects a logical model, and logs request outcomes to JSONL evidence.
 
-## Current Implementation
+The current implementation is intentionally small and deterministic. It does not implement cost-quality routing, learned routing, quota enforcement, or a full production auth system.
 
-- OpenAI-compatible `POST /v1/chat/completions`
-- Ollama local provider
-- Google Gemini external provider
-- LiteLLM provider normalization
-- Deterministic request routing
-- Project-level authentication
-- Project isolation
-- Request-level observability
-- Request latency and token-usage recording
-- Basic upstream failure handling
+## What the gateway does today
 
-### Provider Mapping
+- Accepts `POST /v1/chat/completions`
+- Validates request shape and supported message roles
+- Rejects unsupported fields and rejects `stream=true`
+- Routes requests by model alias using a deterministic heuristic
+- Calls LiteLLM with the selected logical model
+- Records outcome metadata in `evidence/requests.jsonl`
+- Retries only for eligible transient upstream failures
+- Avoids creating a second upstream call when ledger persistence fails after a successful provider response
 
-| Logical Model | Provider |
-|---|---|
-| `local-general` | Ollama |
-| `external-general` | Google Gemini |
+## Current model-routing logic
 
-## Architecture
+The app uses two logical models:
 
-```text
-                    OpenAI-Compatible Client
-                              |
-                              v
-                    +---------------------+
-                    |    DAT Gateway      |
-                    |      :8000          |
-                    +---------------------+
-                              |
-                +-------------+-------------+
-                |             |             |
-                v             v             v
-             Auth         Routing       Observability
-                |             |
-                +-------------+
-                              |
-                              v
-                    +---------------------+
-                    |      LiteLLM        |
-                    |       :4000         |
-                    +----------+----------+
-                               |
-                    +----------+----------+
-                    |                     |
-                    v                     v
-              +-----------+        +-------------+
-              |  Ollama   |        |   Gemini    |
-              |  Local    |        |  External   |
-              +-----------+        +-------------+
-```
+- `local-general` -> local/LiteLLM-backed Ollama route
+- `external-general` -> external/LiteLLM-backed provider route
 
-## Project Structure
+Routing behavior:
+
+- If `model` is explicitly set to `local-general` or `external-general`, that explicit value is used.
+- If `model` is `auto`, the gateway inspects the user message text for coding keywords such as `python`, `code`, `debug`, `function`, `rust`, `javascript`, and `compile`.
+- Coding-heavy prompts route to `local-general`.
+- Other prompts route to `external-general`.
+- Unknown model aliases raise a validation error instead of silently falling back to another provider.
+
+## Current request validation
+
+The request model is defined in `gateway/models.py` and enforces:
+
+- `messages` must be present and non-empty
+- supported roles are `system`, `user`, and `assistant`
+- `temperature` must be between `0` and `2` when provided
+- `max_tokens` must be positive when provided
+- `stream` must be `False`
+- extra fields are rejected
+
+## Fallback and failure handling
+
+The gateway tries the selected model and, for `auto` routing only, may also try the permitted fallback model.
+
+Fallback behavior in the current code is limited to:
+
+- `external-general` -> `local-general`
+- only for retryable upstream failures such as timeout, transport error, HTTP `429`, or HTTP `5xx`
+
+Permanent failures and non-retryable errors stop the attempt loop without silently retrying forever.
+
+## Project structure
 
 ```text
 gateway/
 ├── gateway/
+│   ├── __init__.py
+│   ├── isolation.py
+│   ├── ledger.py
 │   ├── main.py
 │   ├── models.py
 │   ├── routing.py
-│   ├── isolation.py
-│   ├── ledger.py
 │   └── upstream.py
 ├── litellm/
 │   └── config.yaml
 ├── tests/
-├── benchmarks/
-├── docs/
+│   ├── test_main_failure_behaviour.py
+│   └── test_models_routing.py
 ├── evidence/
-├── .env
-└── README.md
+│   └── requests.jsonl
+├── .env.example
+├── requirements.lock.txt
+├── README.md
+└── .venv/
 ```
 
 ## Requirements
 
-- Python
-- Ollama
-- LiteLLM
-- Gemini API key
+- Python 3.11+ recommended
+- a working LiteLLM instance
+- a local Ollama model for the local route
+- any required external provider credentials in the configured provider stack
+- a valid environment for running the app and tests
 
-## Environment
+## Environment setup
 
-Create `.env`:
+Copy `.env.example` if present and set values for your local environment.
 
-```env
-LITELLM_MASTER_KEY=sk-dev-master-key
-GEMINI_API_KEY=<your-gemini-api-key>
+Typical variables used by the project include:
+
+```bash
+LITELLM_MASTER_KEY=your-dev-key
 LITELLM_URL=http://127.0.0.1:4000
+GEMINI_API_KEY=your-gemini-key
+PROJECT_A_API_KEY=project-a-key
+PROJECT_B_API_KEY=project-b-key
 ```
 
-Do not commit `.env`.
+If the current code uses a different environment convention, follow the actual values defined in `gateway/isolation.py` and `gateway/upstream.py` rather than assuming the examples are universal.
 
-## Installation
+## Running the gateway
+
+From the project root:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-
-pip install 'litellm[proxy]'
-pip install fastapi uvicorn httpx pydantic-settings
+cd /home/rohith/Projects/Intelliway/gateway
+. .venv/bin/activate
 ```
 
-Verify Ollama:
+Then start the app:
 
 ```bash
-ollama list
+uvicorn gateway.main:app --host 127.0.0.1 --port 8000
 ```
 
-## Running
+If LiteLLM is running separately, point it at the configured proxy URL and keep the `LITELLM_MASTER_KEY` value in sync with the gateway.
 
-### 1. Start LiteLLM
-
-```bash
-source .venv/bin/activate
-
-set -a
-source .env
-set +a
-
-litellm \
-  --config litellm/config.yaml \
-  --port 4000
-```
-
-### 2. Start the DAT Gateway
-
-In another terminal:
-
-```bash
-source .venv/bin/activate
-
-set -a
-source .env
-set +a
-
-uvicorn gateway.main:app \
-  --host 127.0.0.1 \
-  --port 8000
-```
-
-## Health Checks
-
-### Gateway
+## Health check
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-Expected:
+Expected response shape:
 
 ```json
 {
@@ -160,217 +133,79 @@ Expected:
 }
 ```
 
-### LiteLLM
+## Example request
 
 ```bash
-curl http://127.0.0.1:4000/health \
-  -H "Authorization: Bearer $LITELLM_MASTER_KEY"
-```
-
-Both Ollama and Gemini should be reported as healthy.
-
-## API Tests
-
-### Test 1 — Local/Ollama Routing
-
-Coding requests are routed to `local-general`.
-
-```bash
-curl http://127.0.0.1:8000/v1/chat/completions \
-  -H "Authorization: Bearer sk-project-a" \
+curl -i http://127.0.0.1:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "auto",
     "messages": [
-      {
-        "role": "user",
-        "content": "Write a Python function that calculates factorial."
-      }
+      {"role": "user", "content": "Write a Python function to reverse a string."}
     ],
-    "temperature": 0
+    "temperature": 0,
+    "max_tokens": 256
   }'
 ```
 
-Expected route:
+## Ledger output
 
-```text
-Gateway
-  -> local-general
-  -> LiteLLM
-  -> Ollama
-```
-
-Expected: HTTP `200`.
-
----
-
-### Test 2 — External/Gemini Routing
-
-General requests are routed to `external-general`.
-
-```bash
-curl http://127.0.0.1:8000/v1/chat/completions \
-  -H "Authorization: Bearer sk-project-a" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "auto",
-    "messages": [
-      {
-        "role": "user",
-        "content": "Explain why the sky appears blue."
-      }
-    ]
-  }'
-```
-
-Expected route:
-
-```text
-Gateway
-  -> external-general
-  -> LiteLLM
-  -> Gemini
-```
-
-Expected: HTTP `200` when Gemini is available.
-
----
-
-### Test 3 — Invalid Authentication
-
-```bash
-curl -i http://127.0.0.1:8000/v1/chat/completions \
-  -H "Authorization: Bearer invalid-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "auto",
-    "messages": [
-      {
-        "role": "user",
-        "content": "Hello"
-      }
-    ]
-  }'
-```
-
-Expected:
-
-```text
-HTTP 401
-```
-
----
-
-### Test 4 — Missing Authentication
-
-```bash
-curl -i http://127.0.0.1:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "auto",
-    "messages": [
-      {
-        "role": "user",
-        "content": "Hello"
-      }
-    ]
-  }'
-```
-
-Expected:
-
-```text
-HTTP 401
-```
-
----
-
-### Test 5 — Unsupported Request Field
-
-Unknown fields must not be silently ignored.
-
-```bash
-curl -i http://127.0.0.1:8000/v1/chat/completions \
-  -H "Authorization: Bearer sk-project-a" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "auto",
-    "messages": [
-      {
-        "role": "user",
-        "content": "Hello"
-      }
-    ],
-    "unsupported_option": true
-  }'
-```
-
-Expected:
-
-```text
-HTTP 422
-```
-
----
-
-### Test 6 — Project Isolation
-
-Authenticated project identity must not be overridden by a user-supplied project ID.
-
-```bash
-curl http://127.0.0.1:8000/v1/chat/completions \
-  -H "Authorization: Bearer sk-project-a" \
-  -H "X-Project-ID: project-b" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "auto",
-    "messages": [
-      {
-        "role": "user",
-        "content": "Hello"
-      }
-    ]
-  }'
-```
-
-Expected:
-
-```text
-project_id = project-a
-```
-
----
-
-## Observability
-
-Request information is recorded in:
+Successful and failed requests are appended to the JSONL ledger:
 
 ```text
 evidence/requests.jsonl
 ```
 
-View the records with:
+Each line contains metadata such as:
+
+- request ID
+- project identifier
+- requested model
+- selected model
+- status
+- latency
+- number of attempts
+- failure class when applicable
+- usage payload returned by the provider
+
+## Test status
+
+The current project tests are run with:
 
 ```bash
-cat evidence/requests.jsonl
+cd /home/rohith/Projects/Intelliway/gateway
+. .venv/bin/activate
+python -m pytest -q
 ```
 
-Each record contains information such as:
+Current status in this workspace: the suite is passing.
 
-```json
-{
-  "request_id": "...",
-  "project_id": "project-a",
-  "requested_model": "auto",
-  "selected_model": "local-general",
-  "status": "success",
-  "latency_ms": 11200.74,
-  "attempts": 1,
-  "failure_class": null,
-  "usage": {
-    "completion_tokens": 327,
-    "prompt_tokens": 40,
-    "total_tokens": 367
-  }
-}
-```
+## Known limits
+
+This implementation is not a production routing or cost-optimization system. It is a small gateway layer that currently focuses on:
+
+- request validation
+- deterministic routing
+- retryable upstream fallback
+- request ledger logging
+- testable behavior around model selection and failure cases
+
+The following are intentionally outside the current scope:
+
+- cost-quality routing
+- advanced quota and policy enforcement
+- production-grade auth and project isolation
+- replica scheduling or load-aware routing
+- distributed cache and benchmark orchestration
+
+## Notes for future work
+
+If this project grows, the next natural additions are:
+
+1. a proper auth layer with project-scoped API keys
+2. per-project policy and quota checks
+3. a safe cache layer with invalidation rules
+4. quality/cost-aware routing using a documented policy
+5. a reproducible benchmark suite for latency, quality, and cost
+
+For now, the gateway is best understood as a controlled, small OpenAI-compatible wrapper around LiteLLM with explicit routing rules and basic observability.
