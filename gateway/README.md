@@ -85,14 +85,15 @@ gateway/
 ├── evidence/
 │   └── requests.jsonl
 ├── .env.example
-├── requirements.lock.txt
+├── pyproject.toml
+├── uv.lock
 ├── README.md
 └── .venv/
 ```
 
 ## Requirements
 
-- Python 3.11+ recommended
+- Python 3.12+ recommended
 - a working LiteLLM instance
 - a local Ollama model for the local route
 - any required external provider credentials in the configured provider stack
@@ -120,13 +121,13 @@ From the project root:
 
 ```bash
 cd /home/rohith/Projects/Intelliway/gateway
-. .venv/bin/activate
+python -m uv sync
 ```
 
 Then start the app:
 
 ```bash
-uvicorn gateway.main:app --host 127.0.0.1 --port 8000
+python -m uv run uvicorn gateway.main:app --host 127.0.0.1 --port 8000
 ```
 
 If LiteLLM is running separately, point it at the configured proxy URL and keep the `LITELLM_MASTER_KEY` value in sync with the gateway.
@@ -187,8 +188,7 @@ The current project tests are run with:
 
 ```bash
 cd /home/rohith/Projects/Intelliway/gateway
-. .venv/bin/activate
-python -m pytest -q
+python -m uv run pytest -q
 ```
 
 Current status in this workspace: the suite is passing.
