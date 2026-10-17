@@ -3,3 +3,7 @@ requests.jsonl
 .env
 graphify-out/
 .worktrees/
+
+# Docker / Podman volumes and data
+timescaledb_data/
+redis_data/
