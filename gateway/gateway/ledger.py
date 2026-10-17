@@ -9,7 +9,6 @@ LEDGER_PATH = Path("evidence/requests.jsonl")
 def record_request(
     *,
     request_id: str,
-    project_id: str,
     requested_model: str,
     selected_model: str,
     status: str,
@@ -23,7 +22,6 @@ def record_request(
     record = {
         "timestamp": time.time(),
         "request_id": request_id,
-        "project_id": project_id,
         "requested_model": requested_model,
         "selected_model": selected_model,
         "status": status,

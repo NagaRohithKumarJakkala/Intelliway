@@ -35,9 +35,6 @@ def test_ledger_failure_does_not_generate_twice(monkeypatch):
 
     response = client.post(
         "/v1/chat/completions",
-        headers={
-            "Authorization": "Bearer sk-project-a",
-        },
         json={
             "model": "external-general",
             "messages": [
@@ -108,9 +105,6 @@ def test_streaming_is_rejected_before_provider_call(monkeypatch):
 
     response = client.post(
         "/v1/chat/completions",
-        headers={
-            "Authorization": "Bearer sk-project-a",
-        },
         json={
             "model": "auto",
             "stream": True,
@@ -138,11 +132,6 @@ def test_auto_local_does_not_fall_back_to_external_model(monkeypatch):
         main,
         "send_to_litellm",
         failing_send_to_litellm,
-    )
-    monkeypatch.setattr(
-        main,
-        "authenticate_project",
-        lambda authorization: None,
     )
 
     client = TestClient(main.app)

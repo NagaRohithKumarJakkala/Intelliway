@@ -15,11 +15,6 @@ from .routing import (
 from .upstream import send_to_litellm
 
 
-from fastapi import FastAPI, Header, HTTPException
-
-from .isolation import authenticate_project
-
-
 
 app = FastAPI(
     title="DAT AI Gateway",
@@ -70,12 +65,9 @@ def _is_retryable_upstream_error(exc: Exception) -> bool:
 @app.post("/v1/chat/completions")
 async def chat_completion(
     request: ChatCompletionRequest,
-    authorization: str | None = Header(default=None),
 ):
     request_id = str(uuid.uuid4())
     start = time.perf_counter()
-
-    project_id = authenticate_project(authorization)
 
     try:
         initial_model = route_request(request)
@@ -136,7 +128,6 @@ async def chat_completion(
 
         _safe_record_request(
             request_id=request_id,
-            project_id=project_id,
             requested_model=request.model,
             selected_model=selected_model,
             status="success",
@@ -154,7 +145,6 @@ async def chat_completion(
 
     _safe_record_request(
         request_id=request_id,
-        project_id=project_id,
         requested_model=request.model,
         selected_model=initial_model,
         status="error",

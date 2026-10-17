@@ -71,7 +71,6 @@ Permanent failures and non-retryable errors stop the attempt loop without silent
 gateway/
 ├── gateway/
 │   ├── __init__.py
-│   ├── isolation.py
 │   ├── ledger.py
 │   ├── main.py
 │   ├── models.py
@@ -111,11 +110,9 @@ Typical variables used by the project include:
 LITELLM_MASTER_KEY=your-dev-key
 LITELLM_URL=http://127.0.0.1:4000
 GEMINI_API_KEY=your-gemini-key
-PROJECT_A_API_KEY=project-a-key
-PROJECT_B_API_KEY=project-b-key
 ```
 
-If the current code uses a different environment convention, follow the actual values defined in `gateway/isolation.py` and `gateway/upstream.py` rather than assuming the examples are universal.
+If the current code uses a different environment convention, follow the actual values defined in `gateway/upstream.py` rather than assuming the examples are universal.
 
 ## Running the gateway
 
@@ -175,7 +172,6 @@ evidence/requests.jsonl
 Each line contains metadata such as:
 
 - request ID
-- project identifier
 - requested model
 - selected model
 - status
