@@ -1,4 +1,3 @@
-
 import time
 import uuid
 
@@ -12,9 +11,7 @@ from .routing import (
     fallback_model,
     route_request,
 )
-from .upstream import send_to_litellm
-
-
+from .upstream import send_to_litellm, send_to_semantic_router
 
 app = FastAPI(
     title="DAT AI Gateway",
@@ -33,21 +30,17 @@ async def health():
 def _safe_record_request(**kwargs) -> bool:
     """
     Telemetry failure must not trigger another provider generation.
-
     Returns True if the record was written, False otherwise.
     """
     try:
         record_request(**kwargs)
         return True
     except Exception:
-        # Do not log request contents, credentials, or sensitive data.
-        # Durable recovery of failed writes must be added separately.
         return False
 
 
 def _is_retryable_upstream_error(exc: Exception) -> bool:
     """Allow fallback only for eligible transient upstream failures."""
-
     if isinstance(
         exc,
         (httpx.TimeoutException, httpx.TransportError),
@@ -59,7 +52,6 @@ def _is_retryable_upstream_error(exc: Exception) -> bool:
         return status == 429 or status >= 500
 
     return False
-
 
 
 @app.post("/v1/chat/completions")

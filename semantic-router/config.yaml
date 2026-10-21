@@ -1,0 +1,60 @@
+# vLLM Semantic Router Configuration
+# https://github.com/vllm-project/semantic-router
+
+listeners:
+  - name: "http-listener"
+    address: "0.0.0.0"
+    port: 8899
+    timeout: "300s"
+
+providers:
+  models:
+    - name: "local-general"
+      provider_model_id: "local-general"
+      backend_refs:
+        - name: "litellm-proxy"
+          endpoint: "litellm:4000"
+          protocol: "http"
+    - name: "external-general"
+      provider_model_id: "external-general"
+      backend_refs:
+        - name: "litellm-proxy"
+          endpoint: "litellm:4000"
+          protocol: "http"
+
+routing:
+  recipes:
+    - name: "baseline-recipe"
+      rules:
+        - name: "coding-rule"
+          description: "Route coding and technical programming tasks to local model"
+          priority: 100
+          rules:
+            operator: "OR"
+            conditions:
+              - type: "keyword"
+                name: "coding_keywords"
+                keywords:
+                  - "code"
+                  - "python"
+                  - "rust"
+                  - "c++"
+                  - "javascript"
+                  - "typescript"
+                  - "program"
+                  - "debug"
+                  - "function"
+                  - "class"
+                  - "compile"
+                  - "algorithm"
+          modelRefs:
+            - model: "local-general"
+
+        - name: "default-rule"
+          description: "Default fallback to external general model"
+          priority: 1
+          rules:
+            operator: "AND"
+            conditions: []
+          modelRefs:
+            - model: "external-general"

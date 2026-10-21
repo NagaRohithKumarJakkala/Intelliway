@@ -58,6 +58,21 @@ services:
     networks:
       - litellm-net
 
+  semantic-router:
+    image: ghcr.io/vllm-project/semantic-router/vllm-sr:latest
+    container_name: vllm-semantic-router
+    restart: unless-stopped
+    ports:
+      - "8899:8899"
+    volumes:
+      - ./semantic-router/config.yaml:/app/config/config.yaml:ro
+    environment:
+      - CONFIG_FILE=/app/config/config.yaml
+    depends_on:
+      - litellm
+    networks:
+      - litellm-net
+
 volumes:
   timescaledb_data:
   redis_data:
