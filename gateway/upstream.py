@@ -49,7 +49,7 @@ async def send_to_litellm(
 
 
 async def send_to_semantic_router(
-    messages: list[dict],
+    messages: list[dict] | None = None,
     model: str = "auto",
     temperature: float | None = None,
     max_tokens: int | None = None,
@@ -58,6 +58,9 @@ async def send_to_semantic_router(
     Send an automatic-routing request through the vLLM Semantic Router container.
     The container evaluates semantic rules and forwards to the upstream provider (LiteLLM).
     """
+    if messages is None:
+        messages = []
+
     payload = {
         "model": model,
         "messages": messages,

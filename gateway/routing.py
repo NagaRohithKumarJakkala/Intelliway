@@ -40,13 +40,22 @@ CODING_KEYWORDS = {
 }
 
 
+def is_explicit_model(model: str) -> bool:
+    """Return True if the model is one of the explicit targets."""
+    return model in EXPLICIT_MODELS
+
+
 def canonical_auto_preset(requested_model: str) -> str | None:
     """Return the canonical automatic preset, or None for explicit models."""
     return AUTO_MODEL_ALIASES.get(requested_model)
 
 
 def route_request(request: ChatCompletionRequest) -> str:
-    """Honor explicit models and apply the baseline automatic policies."""
+    """
+    Honor explicit models and apply the baseline automatic policies.
+    Used for local testing, fallback, and simulation when vLLM Semantic Router
+    is not running.
+    """
     requested_model = request.model
 
     # An explicit model choice takes precedence.

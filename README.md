@@ -10,7 +10,7 @@ An OpenAI-compatible AI gateway and routing layer built with FastAPI, LiteLLM, v
 |---|---|---|
 | **API Gateway** (`gateway`) | `8000` | FastAPI proxy handling request routing, retries, fallbacks, and ledger logging |
 | **LiteLLM Proxy** | `4000` | Multi-provider LLM interface (Ollama, Gemini, OpenAI, etc.) |
-| **Semantic Router** | `8899` | Rule-based / keyword semantic dispatcher |
+| **Semantic Router** | `8899` | Multi-signal semantic classifier and Mixture-of-Models dispatcher |
 | **TimescaleDB** | `5432` | PostgreSQL persistence for LiteLLM metrics and state |
 | **Redis** | `6379` | Response caching and rate-limiting |
 
