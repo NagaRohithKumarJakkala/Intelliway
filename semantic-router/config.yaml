@@ -1,5 +1,17 @@
+# =============================================================================
 # vLLM Semantic Router Configuration
 # https://github.com/vllm-project/semantic-router
+#
+# Architecture Overview:
+# ----------------------
+# 1. Listeners: Exposes OpenAI-compatible HTTP interface on port 8899.
+# 2. Providers: Declares the candidate model catalog across Local and External pools.
+# 3. Entrypoints: Maps public request model names to named routing recipes.
+# 4. Recipes: Defines the 4 routing profiles (auto-balanced, auto-cost,
+#    auto-quality, and auto-local) with rule-based and keyword-driven policies.
+# =============================================================================
+
+version: v0.3
 
 listeners:
   - name: "http-listener"
@@ -7,27 +19,186 @@ listeners:
     port: 8899
     timeout: "300s"
 
+# =============================================================================
+# PROVIDERS & MODEL CATALOG
+# -----------------------------------------------------------------------------
+# Instructions for Model Pools:
+# - Local Model Pool: Models hosted on-premise (e.g. Ollama, vLLM).
+#   Zero external API cost, strict data privacy, lower latency for small models.
+# - External Model Pool: Cloud-hosted frontier models (Gemini, OpenAI, Claude).
+#   Paid per token, high reasoning capability, larger context windows.
+#
+# To customize model pools:
+# 1. Add/modify the model entry under 'providers.models' below.
+# 2. Ensure a corresponding entry exists in 'litellm/config.yaml'.
+# 3. Adjust backend_refs endpoint, protocol, and weight (for load balancing).
+# =============================================================================
 providers:
+  defaults:
+    model: "local-general"
+
   models:
+    # ── Local Model Pool ──────────────────────────────────────────────────────
     - name: "local-general"
       provider_model_id: "local-general"
+      description: "Default local model for routine tasks, conversation, and fallback"
+      pricing:
+        prompt_per_1m: 0.0
+        completion_per_1m: 0.0
       backend_refs:
         - name: "litellm-proxy"
           endpoint: "litellm:4000"
           protocol: "http"
+          weight: 100
+
+    - name: "local-coder"
+      provider_model_id: "local-coder"
+      description: "Specialized local model for code generation, debugging, and scripts"
+      pricing:
+        prompt_per_1m: 0.0
+        completion_per_1m: 0.0
+      backend_refs:
+        - name: "litellm-proxy"
+          endpoint: "litellm:4000"
+          protocol: "http"
+          weight: 100
+
+    - name: "local-reasoner"
+      provider_model_id: "local-reasoner"
+      description: "Specialized local model for math, algorithms, and step-by-step logic"
+      pricing:
+        prompt_per_1m: 0.0
+        completion_per_1m: 0.0
+      backend_refs:
+        - name: "litellm-proxy"
+          endpoint: "litellm:4000"
+          protocol: "http"
+          weight: 100
+
+    - name: "local-fast"
+      provider_model_id: "local-fast"
+      description: "Ultra-low latency lightweight local model for greetings, classifications, and trivial QA"
+      pricing:
+        prompt_per_1m: 0.0
+        completion_per_1m: 0.0
+      backend_refs:
+        - name: "litellm-proxy"
+          endpoint: "litellm:4000"
+          protocol: "http"
+          weight: 100
+
+    # ── External / Cloud Model Pool ──────────────────────────────────────────
     - name: "external-general"
       provider_model_id: "external-general"
+      description: "Standard external cloud model (e.g. Gemini 3.8 Flash) for general queries"
+      pricing:
+        prompt_per_1m: 0.075
+        completion_per_1m: 0.30
       backend_refs:
         - name: "litellm-proxy"
           endpoint: "litellm:4000"
           protocol: "http"
+          weight: 100
 
+    - name: "external-frontier"
+      provider_model_id: "external-frontier"
+      description: "High-capability frontier cloud model (e.g. Gemini 3.1 Pro) for deep reasoning"
+      pricing:
+        prompt_per_1m: 1.25
+        completion_per_1m: 5.00
+      backend_refs:
+        - name: "litellm-proxy"
+          endpoint: "litellm:4000"
+          protocol: "http"
+          weight: 100
+
+    - name: "external-coder"
+      provider_model_id: "external-coder"
+      description: "High-performance cloud coding specialist for complex software engineering"
+      pricing:
+        prompt_per_1m: 0.80
+        completion_per_1m: 3.20
+      backend_refs:
+        - name: "litellm-proxy"
+          endpoint: "litellm:4000"
+          protocol: "http"
+          weight: 100
+
+    - name: "external-fast"
+      provider_model_id: "external-fast"
+      description: "Cost-efficient, high-throughput cloud model (e.g. Gemini 2.5 Flash-Lite)"
+      pricing:
+        prompt_per_1m: 0.02
+        completion_per_1m: 0.08
+      backend_refs:
+        - name: "litellm-proxy"
+          endpoint: "litellm:4000"
+          protocol: "http"
+          weight: 100
+
+# =============================================================================
+# ENTRYPOINTS
+# -----------------------------------------------------------------------------
+# Maps public model names requested by clients to specific routing recipes.
+# - 'auto' is an alias for 'auto-balanced'
+# - Also aliases 'vllm-sr/*' namespaces for upstream compatibility
+# =============================================================================
+entrypoints:
+  # ---------------------------------------------------------------------------
+  # Profile: auto-balanced (and 'auto')
+  # ---------------------------------------------------------------------------
+  - model_names:
+      - "auto"
+      - "auto-balanced"
+    recipe: "auto-balanced"
+
+  # ---------------------------------------------------------------------------
+  # Profile: auto-cost
+  # ---------------------------------------------------------------------------
+  - model_names:
+      - "auto-cost"
+    recipe: "auto-cost"
+
+  # ---------------------------------------------------------------------------
+  # Profile: auto-quality
+  # ---------------------------------------------------------------------------
+  - model_names:
+      - "auto-quality"
+      - "vllm-sr/auto-quality"
+    recipe: "auto-quality"
+
+  # ---------------------------------------------------------------------------
+  # Profile: auto-local
+  # ---------------------------------------------------------------------------
+  - model_names:
+      - "auto-local"
+    recipe: "auto-local"
+
+# =============================================================================
+# ROUTING RECIPES / PROFILES
+# -----------------------------------------------------------------------------
+# Instructions for Setting Priorities:
+# - Higher priority numbers (e.g. 100) are evaluated first.
+# - The first rule whose conditions evaluate to True selects the modelRefs.
+# - The default-rule (priority: 1) acts as the catch-all baseline.
+# - 'modelRefs' can list multiple candidate models in order of fallback.
+# =============================================================================
 routing:
   recipes:
-    - name: "baseline-recipe"
+    # =========================================================================
+    # PROFILE 1: auto-balanced (default)
+    # -------------------------------------------------------------------------
+    # Policy:
+    # - Coding & technical tasks -> local-coder (fast iteration, free, private)
+    # - Complex reasoning & architecture -> external-frontier (maximum capability)
+    # - Lightweight greetings / chitchat -> local-fast (low latency)
+    # - Default general traffic -> external-general (balanced quality/cost)
+    # =========================================================================
+    - name: "auto-balanced"
+      description: "Balanced routing policy optimizing between latency, operational cost, and reasoning capability"
       rules:
-        - name: "coding-rule"
-          description: "Route coding and technical programming tasks to local model"
+        - name: "balanced-coding"
+          description: "Route coding, technical programming, and debugging to local coding model"
           priority: 100
           rules:
             operator: "OR"
@@ -39,22 +210,449 @@ routing:
                   - "python"
                   - "rust"
                   - "c++"
+                  - "cpp"
                   - "javascript"
                   - "typescript"
-                  - "program"
+                  - "golang"
+                  - "java"
+                  - "sql"
+                  - "html"
+                  - "css"
+                  - "bash"
+                  - "shell"
+                  - "git"
                   - "debug"
                   - "function"
                   - "class"
                   - "compile"
                   - "algorithm"
+                  - "refactor"
+                  - "api"
+                  - "endpoint"
+                  - "regex"
+                  - "syntax"
+                  - "recursion"
           modelRefs:
+            - model: "local-coder"
             - model: "local-general"
 
-        - name: "default-rule"
-          description: "Default fallback to external general model"
+        - name: "balanced-deep-reasoning"
+          description: "Route formal math, architectural analysis, and complex proofs to cloud frontier model"
+          priority: 90
+          rules:
+            operator: "OR"
+            conditions:
+              - type: "keyword"
+                name: "reasoning_keywords"
+                keywords:
+                  - "proof"
+                  - "prove"
+                  - "theorem"
+                  - "calculus"
+                  - "differential equation"
+                  - "matrix"
+                  - "eigenvalue"
+                  - "quantum"
+                  - "step-by-step reasoning"
+                  - "formal verification"
+                  - "system architecture"
+                  - "distributed systems"
+                  - "consensus algorithm"
+          modelRefs:
+            - model: "external-frontier"
+            - model: "external-general"
+
+        - name: "balanced-chitchat"
+          description: "Route brief conversational greetings and simple phrases to fast local model"
+          priority: 60
+          rules:
+            operator: "OR"
+            conditions:
+              - type: "keyword"
+                name: "chitchat_keywords"
+                keywords:
+                  - "hi"
+                  - "hello"
+                  - "hey"
+                  - "how are you"
+                  - "good morning"
+                  - "good evening"
+                  - "tell me a joke"
+                  - "thanks"
+                  - "thank you"
+                  - "who are you"
+                  - "ping"
+          modelRefs:
+            - model: "local-fast"
+            - model: "local-general"
+
+        - name: "balanced-default"
+          description: "Default fallback to external general model for general questions and writing"
           priority: 1
           rules:
             operator: "AND"
             conditions: []
           modelRefs:
             - model: "external-general"
+            - model: "local-general"
+
+    # =========================================================================
+    # PROFILE 2: auto-cost
+    # -------------------------------------------------------------------------
+    # Policy:
+    # - Maximize local execution (zero marginal cost)
+    # - Code, chitchat, summaries, and routine text stay on-premise
+    # - Heavy reasoning/math escalates only to external-fast (low-cost cloud tier)
+    # - Avoids expensive external-frontier models entirely
+    # - Default fallback is local-general
+    # =========================================================================
+    - name: "auto-cost"
+      description: "Cost-minimizing routing policy that prioritizes free local inference and low-cost cloud tiers"
+      rules:
+        - name: "cost-coding-local"
+          description: "Route coding prompts to free local coder"
+          priority: 100
+          rules:
+            operator: "OR"
+            conditions:
+              - type: "keyword"
+                name: "coding_keywords"
+                keywords:
+                  - "code"
+                  - "python"
+                  - "rust"
+                  - "c++"
+                  - "cpp"
+                  - "javascript"
+                  - "typescript"
+                  - "golang"
+                  - "java"
+                  - "sql"
+                  - "html"
+                  - "css"
+                  - "bash"
+                  - "shell"
+                  - "git"
+                  - "debug"
+                  - "function"
+                  - "class"
+                  - "compile"
+                  - "algorithm"
+                  - "refactor"
+                  - "api"
+                  - "endpoint"
+                  - "regex"
+                  - "syntax"
+                  - "recursion"
+          modelRefs:
+            - model: "local-coder"
+            - model: "local-general"
+
+        - name: "cost-chitchat-fast"
+          description: "Route trivial greetings and chitchat to lowest latency local model"
+          priority: 95
+          rules:
+            operator: "OR"
+            conditions:
+              - type: "keyword"
+                name: "chitchat_keywords"
+                keywords:
+                  - "hi"
+                  - "hello"
+                  - "hey"
+                  - "how are you"
+                  - "good morning"
+                  - "good evening"
+                  - "tell me a joke"
+                  - "thanks"
+                  - "thank you"
+                  - "who are you"
+                  - "ping"
+          modelRefs:
+            - model: "local-fast"
+            - model: "local-general"
+
+        - name: "cost-text-processing-local"
+          description: "Route summarization, translation, and text tasks to local general model"
+          priority: 80
+          rules:
+            operator: "OR"
+            conditions:
+              - type: "keyword"
+                name: "text_keywords"
+                keywords:
+                  - "summarize"
+                  - "summary"
+                  - "tldr"
+                  - "paraphrase"
+                  - "rewrite"
+                  - "translate"
+                  - "proofread"
+                  - "draft"
+          modelRefs:
+            - model: "local-general"
+            - model: "local-fast"
+
+        - name: "cost-complex-reasoning-cheap-cloud"
+          description: "Escalate hard mathematical or scientific queries only to high-efficiency, low-cost external tier"
+          priority: 60
+          rules:
+            operator: "OR"
+            conditions:
+              - type: "keyword"
+                name: "reasoning_keywords"
+                keywords:
+                  - "proof"
+                  - "prove"
+                  - "theorem"
+                  - "calculus"
+                  - "differential equation"
+                  - "matrix"
+                  - "eigenvalue"
+                  - "quantum"
+                  - "step-by-step reasoning"
+                  - "formal verification"
+                  - "system architecture"
+                  - "distributed systems"
+          modelRefs:
+            - model: "external-fast"
+            - model: "local-reasoner"
+            - model: "local-general"
+
+        - name: "cost-default"
+          description: "Default fallback keeps traffic on local general model to prevent cloud spend"
+          priority: 1
+          rules:
+            operator: "AND"
+            conditions: []
+          modelRefs:
+            - model: "local-general"
+            - model: "local-fast"
+
+    # =========================================================================
+    # PROFILE 3: auto-quality
+    # -------------------------------------------------------------------------
+    # Policy:
+    # - Maximize response quality, depth, and reasoning capability
+    # - Complex reasoning, STEM, and system design -> external-frontier
+    # - Programming and software engineering -> external-coder (or external-frontier)
+    # - General knowledge & analysis -> external-general
+    # - Trivial chit-chat deflects to local-fast to conserve frontier quota
+    # - Default fallback is external-general / external-frontier
+    # =========================================================================
+    - name: "auto-quality"
+      description: "Quality-maximizing routing policy prioritizing state-of-the-art frontier and specialized cloud models"
+      rules:
+        - name: "quality-deep-reasoning"
+          description: "Route advanced mathematics, proofs, system design, and research to frontier model"
+          priority: 100
+          rules:
+            operator: "OR"
+            conditions:
+              - type: "keyword"
+                name: "reasoning_keywords"
+                keywords:
+                  - "proof"
+                  - "prove"
+                  - "theorem"
+                  - "calculus"
+                  - "differential equation"
+                  - "matrix"
+                  - "eigenvalue"
+                  - "quantum"
+                  - "step-by-step reasoning"
+                  - "formal verification"
+                  - "system architecture"
+                  - "distributed systems"
+                  - "consensus algorithm"
+                  - "trade-offs"
+                  - "comparative analysis"
+                  - "security audit"
+          modelRefs:
+            - model: "external-frontier"
+            - model: "external-general"
+
+        - name: "quality-advanced-coding"
+          description: "Route technical software engineering to specialized cloud coding model"
+          priority: 95
+          rules:
+            operator: "OR"
+            conditions:
+              - type: "keyword"
+                name: "coding_keywords"
+                keywords:
+                  - "code"
+                  - "python"
+                  - "rust"
+                  - "c++"
+                  - "cpp"
+                  - "javascript"
+                  - "typescript"
+                  - "golang"
+                  - "java"
+                  - "sql"
+                  - "html"
+                  - "css"
+                  - "bash"
+                  - "shell"
+                  - "git"
+                  - "debug"
+                  - "function"
+                  - "class"
+                  - "compile"
+                  - "algorithm"
+                  - "refactor"
+                  - "api"
+                  - "endpoint"
+                  - "regex"
+                  - "syntax"
+                  - "recursion"
+          modelRefs:
+            - model: "external-coder"
+            - model: "external-frontier"
+            - model: "external-general"
+
+        - name: "quality-chitchat-deflection"
+          description: "Route basic greetings and chit-chat to fast local model to conserve frontier quota"
+          priority: 30
+          rules:
+            operator: "OR"
+            conditions:
+              - type: "keyword"
+                name: "chitchat_keywords"
+                keywords:
+                  - "hi"
+                  - "hello"
+                  - "hey"
+                  - "how are you"
+                  - "good morning"
+                  - "good evening"
+                  - "tell me a joke"
+                  - "thanks"
+                  - "thank you"
+                  - "who are you"
+                  - "ping"
+          modelRefs:
+            - model: "local-fast"
+            - model: "local-general"
+
+        - name: "quality-default"
+          description: "Default fallback to external general cloud model"
+          priority: 1
+          rules:
+            operator: "AND"
+            conditions: []
+          modelRefs:
+            - model: "external-general"
+            - model: "external-frontier"
+
+    # =========================================================================
+    # PROFILE 4: auto-local
+    # -------------------------------------------------------------------------
+    # Policy:
+    # - Strict containment: picks from a pool of ONLY local models
+    # - Zero cloud models in modelRefs; zero data egress
+    # - Coding & technical -> local-coder
+    # - Logic & math -> local-reasoner
+    # - Chitchat & greetings -> local-fast
+    # - Default -> local-general
+    # =========================================================================
+    - name: "auto-local"
+      description: "Strictly local routing policy with zero external dependencies, guaranteeing full data containment and privacy"
+      rules:
+        - name: "local-coding"
+          description: "Route coding and technical tasks to local coding model"
+          priority: 100
+          rules:
+            operator: "OR"
+            conditions:
+              - type: "keyword"
+                name: "coding_keywords"
+                keywords:
+                  - "code"
+                  - "python"
+                  - "rust"
+                  - "c++"
+                  - "cpp"
+                  - "javascript"
+                  - "typescript"
+                  - "golang"
+                  - "java"
+                  - "sql"
+                  - "html"
+                  - "css"
+                  - "bash"
+                  - "shell"
+                  - "git"
+                  - "debug"
+                  - "function"
+                  - "class"
+                  - "compile"
+                  - "algorithm"
+                  - "refactor"
+                  - "api"
+                  - "endpoint"
+                  - "regex"
+                  - "syntax"
+                  - "recursion"
+          modelRefs:
+            - model: "local-coder"
+            - model: "local-general"
+
+        - name: "local-reasoning"
+          description: "Route math, logic, and reasoning to local reasoning model"
+          priority: 90
+          rules:
+            operator: "OR"
+            conditions:
+              - type: "keyword"
+                name: "reasoning_keywords"
+                keywords:
+                  - "proof"
+                  - "prove"
+                  - "theorem"
+                  - "calculus"
+                  - "differential equation"
+                  - "matrix"
+                  - "eigenvalue"
+                  - "quantum"
+                  - "step-by-step reasoning"
+                  - "formal verification"
+                  - "algorithm"
+                  - "logic"
+          modelRefs:
+            - model: "local-reasoner"
+            - model: "local-general"
+
+        - name: "local-chitchat"
+          description: "Route simple greetings and conversational phrases to fast local model"
+          priority: 50
+          rules:
+            operator: "OR"
+            conditions:
+              - type: "keyword"
+                name: "chitchat_keywords"
+                keywords:
+                  - "hi"
+                  - "hello"
+                  - "hey"
+                  - "how are you"
+                  - "good morning"
+                  - "good evening"
+                  - "tell me a joke"
+                  - "thanks"
+                  - "thank you"
+                  - "who are you"
+                  - "ping"
+          modelRefs:
+            - model: "local-fast"
+            - model: "local-general"
+
+        - name: "local-default"
+          description: "Default fallback to local general model"
+          priority: 1
+          rules:
+            operator: "AND"
+            conditions: []
+          modelRefs:
+            - model: "local-general"

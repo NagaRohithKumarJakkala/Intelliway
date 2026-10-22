@@ -34,6 +34,24 @@ def test_explicit_local_model_is_honored():
     assert route_request(request) == "local-general"
 
 
+@pytest.mark.parametrize(
+    "model_name",
+    [
+        "local-general",
+        "local-coder",
+        "local-reasoner",
+        "local-fast",
+        "external-general",
+        "external-frontier",
+        "external-coder",
+        "external-fast",
+    ],
+)
+def test_all_explicit_models_in_pool_are_honored(model_name):
+    request = make_request(model=model_name)
+    assert route_request(request) == model_name
+
+
 def test_explicit_external_model_is_honored_for_code():
     request = make_request(
         model="external-general",

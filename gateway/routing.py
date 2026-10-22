@@ -3,7 +3,13 @@ from .models import ChatCompletionRequest
 # These aliases must match the model names configured in LiteLLM.
 EXPLICIT_MODELS = {
     "local-general",
+    "local-coder",
+    "local-reasoner",
+    "local-fast",
     "external-general",
+    "external-frontier",
+    "external-coder",
+    "external-fast",
 }
 
 AUTO_ROUTING_PRESETS = {

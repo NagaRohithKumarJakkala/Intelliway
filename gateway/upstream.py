@@ -50,6 +50,7 @@ async def send_to_litellm(
 
 async def send_to_semantic_router(
     messages: list[dict],
+    model: str = "auto",
     temperature: float | None = None,
     max_tokens: int | None = None,
 ):
@@ -58,7 +59,7 @@ async def send_to_semantic_router(
     The container evaluates semantic rules and forwards to the upstream provider (LiteLLM).
     """
     payload = {
-        "model": "vllm-sr/auto",
+        "model": model,
         "messages": messages,
         "stream": False,
     }

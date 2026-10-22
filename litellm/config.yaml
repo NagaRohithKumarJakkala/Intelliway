@@ -1,17 +1,47 @@
 model_list:
 
   # -----------------------------
-  # Local Ollama model (optional)
+  # Local Pool (Ollama)
   # -----------------------------
   - model_name: local-general
     litellm_params:
       model: ollama/qwen2.5:1.5b
       api_base: os.environ/OLLAMA_BASE_URL
 
+  - model_name: local-coder
+    litellm_params:
+      model: ollama/qwen2.5:1.5b
+      api_base: os.environ/OLLAMA_BASE_URL
+
+  - model_name: local-reasoner
+    litellm_params:
+      model: ollama/qwen2.5:1.5b
+      api_base: os.environ/OLLAMA_BASE_URL
+
+  - model_name: local-fast
+    litellm_params:
+      model: ollama/qwen2.5:1.5b
+      api_base: os.environ/OLLAMA_BASE_URL
+
   # -----------------------------
-  # External Gemini model
+  # External Pool (Cloud Providers)
   # -----------------------------
   - model_name: external-general
+    litellm_params:
+      model: gemini/gemini-3.8-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: external-frontier
+    litellm_params:
+      model: gemini/gemini-3.8-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: external-coder
+    litellm_params:
+      model: gemini/gemini-3.8-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: external-fast
     litellm_params:
       model: gemini/gemini-3.8-flash
       api_key: os.environ/GEMINI_API_KEY

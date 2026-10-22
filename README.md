@@ -88,7 +88,13 @@ Expected response:
 
 ### Chat Completion Request
 
-Send a request through the gateway. You can use explicit models (`local-general`, `external-general`) or automatic presets (`auto`, `auto-balanced`, `auto-local`):
+Send a request through the gateway. You can use explicit models (`local-general`, `external-general`, etc.) or one of the 4 automatic routing profiles:
+- `auto` / `auto-balanced`: Balanced trade-off across cost, latency, and capability.
+- `auto-cost`: Cost-minimized routing emphasizing free local execution.
+- `auto-quality`: Quality-maximized routing prioritizing frontier cloud intelligence.
+- `auto-local`: Strictly local routing guaranteeing zero external data egress.
+
+For in-depth details on configuring model pools and rule priorities in vLLM Semantic Router, see [`semantic-router/README.md`](semantic-router/README.md).
 
 ```bash
 curl -X POST http://localhost:8000/v1/chat/completions \
