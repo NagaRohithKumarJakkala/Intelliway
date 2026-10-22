@@ -1,8 +1,20 @@
 # vLLM Semantic Router Configuration & Routing Profiles
 
-Intelliway integrates [vLLM Semantic Router](https://github.com/vllm-project/semantic-router) (`vllm-sr`) as an intelligent, rule-based request classifier and Mixture-of-Models dispatcher.
+Intelliway integrates [vLLM Semantic Router](https://github.com/vllm-project/semantic-router) (`vllm-sr`) as an intelligent, multi-signal request classifier and Mixture-of-Models (MoM) dispatcher.
 
-It listens on port `8899`, intercepts incoming requests specifying virtual model profiles (or explicit model aliases), evaluates configured conditions (keywords, domain rules, priority tiers), and proxies the request to the upstream LiteLLM Proxy (`litellm:4000`).
+It listens on port `8899`, intercepts incoming requests specifying virtual model profiles (or explicit model aliases), evaluates a best-in-class multi-signal pipeline, and proxies the request to the upstream LiteLLM Proxy (`litellm:4000`).
+
+---
+
+## 1. Multi-Signal Decision Architecture
+
+Instead of naive string matching, the router leverages vLLM Semantic Router's multi-signal evaluation layers:
+
+1. **Semantic Embeddings (`type: embedding`)**: Dense vector representations and cosine-similarity matching against curated candidate anchor utterances (with calibrated soft-matching thresholds, e.g. `0.70` - `0.74`).
+2. **Complexity Scoring (`type: complexity`)**: Differential scoring separating routine/easy tasks from high-difficulty, multi-step synthesis (e.g. `code_task:hard`, `reasoning_task:hard`).
+3. **Domain Classification (`type: domain`)**: Intent classification across technical domains (`computer science`, `math`, `engineering`, `general`).
+4. **Context Constraints (`type: context`)**: Token length thresholding (`short_context`, `long_context`).
+5. **Priority Fallbacks (`priority: 100 -> 1`)**: Strict precedence hierarchy ending in a default baseline catch-all rule.
 
 ---
 

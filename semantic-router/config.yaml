@@ -1,14 +1,15 @@
 # =============================================================================
-# vLLM Semantic Router Configuration
+# vLLM Semantic Router Configuration (Best-in-Class Multi-Signal Architecture)
 # https://github.com/vllm-project/semantic-router
 #
-# Architecture Overview:
-# ----------------------
-# 1. Listeners: Exposes OpenAI-compatible HTTP interface on port 8899.
-# 2. Providers: Declares the candidate model catalog across Local and External pools.
-# 3. Entrypoints: Maps public request model names to named routing recipes.
-# 4. Recipes: Defines the 4 routing profiles (auto-balanced, auto-cost,
-#    auto-quality, and auto-local) with rule-based and keyword-driven policies.
+# Routing Signals Pipeline:
+# 1. Semantic Embeddings (type: embedding): Dense vector cosine-similarity against
+#    curated anchor utterances (soft matching with calibrated thresholds).
+# 2. Complexity Scoring (type: complexity): Differential easy vs. hard candidate
+#    projections (e.g. basic syntax vs. distributed systems).
+# 3. Domain Classification (type: domain): Domain intent boundaries (computer science,
+#    math, engineering, business, general).
+# 4. Context Windows (type: context): Token length brackets (short, medium, long).
 # =============================================================================
 
 version: v0.3
@@ -19,26 +20,23 @@ listeners:
     port: 8899
     timeout: "300s"
 
+global:
+  model_catalog:
+    embeddings:
+      semantic:
+        embedding_config:
+          enable_soft_matching: true
+          top_k: 3
+
 # =============================================================================
 # PROVIDERS & MODEL CATALOG
-# -----------------------------------------------------------------------------
-# Instructions for Model Pools:
-# - Local Model Pool: Models hosted on-premise (e.g. Ollama, vLLM).
-#   Zero external API cost, strict data privacy, lower latency for small models.
-# - External Model Pool: Cloud-hosted frontier models (Gemini, OpenAI, Claude).
-#   Paid per token, high reasoning capability, larger context windows.
-#
-# To customize model pools:
-# 1. Add/modify the model entry under 'providers.models' below.
-# 2. Ensure a corresponding entry exists in 'litellm/config.yaml'.
-# 3. Adjust backend_refs endpoint, protocol, and weight (for load balancing).
 # =============================================================================
 providers:
   defaults:
     model: "local-general"
 
   models:
-    # ── Local Model Pool ──────────────────────────────────────────────────────
+    # ── Local Model Pool (Zero marginal cost, on-premise containment) ───────
     - name: "local-general"
       provider_model_id: "local-general"
       description: "Default local model for routine tasks, conversation, and fallback"
@@ -77,7 +75,7 @@ providers:
 
     - name: "local-fast"
       provider_model_id: "local-fast"
-      description: "Ultra-low latency lightweight local model for greetings, classifications, and trivial QA"
+      description: "Ultra-low latency lightweight local model for greetings and trivial QA"
       pricing:
         prompt_per_1m: 0.0
         completion_per_1m: 0.0
@@ -102,7 +100,7 @@ providers:
 
     - name: "external-frontier"
       provider_model_id: "external-frontier"
-      description: "High-capability frontier cloud model (e.g. Gemini 3.1 Pro) for deep reasoning"
+      description: "High-capability frontier cloud model (e.g. Gemini 3.1 Pro / GPT-5) for deep reasoning"
       pricing:
         prompt_per_1m: 1.25
         completion_per_1m: 5.00
@@ -137,157 +135,193 @@ providers:
           weight: 100
 
 # =============================================================================
-# ENTRYPOINTS
-# -----------------------------------------------------------------------------
-# Maps public model names requested by clients to specific routing recipes.
-# - 'auto' is an alias for 'auto-balanced'
-# - Also aliases 'vllm-sr/*' namespaces for upstream compatibility
+# ENTRYPOINTS (Virtual Profile Mapping)
 # =============================================================================
 entrypoints:
-  # ---------------------------------------------------------------------------
-  # Profile: auto-balanced (and 'auto')
-  # ---------------------------------------------------------------------------
   - model_names:
       - "auto"
       - "auto-balanced"
+      - "vllm-sr/auto"
+      - "vllm-sr/auto-balanced"
     recipe: "auto-balanced"
 
-  # ---------------------------------------------------------------------------
-  # Profile: auto-cost
-  # ---------------------------------------------------------------------------
   - model_names:
       - "auto-cost"
+      - "vllm-sr/auto-cost"
     recipe: "auto-cost"
 
-  # ---------------------------------------------------------------------------
-  # Profile: auto-quality
-  # ---------------------------------------------------------------------------
   - model_names:
       - "auto-quality"
       - "vllm-sr/auto-quality"
     recipe: "auto-quality"
 
-  # ---------------------------------------------------------------------------
-  # Profile: auto-local
-  # ---------------------------------------------------------------------------
   - model_names:
       - "auto-local"
+      - "vllm-sr/auto-local"
     recipe: "auto-local"
 
 # =============================================================================
 # ROUTING RECIPES / PROFILES
-# -----------------------------------------------------------------------------
-# Instructions for Setting Priorities:
-# - Higher priority numbers (e.g. 100) are evaluated first.
-# - The first rule whose conditions evaluate to True selects the modelRefs.
-# - The default-rule (priority: 1) acts as the catch-all baseline.
-# - 'modelRefs' can list multiple candidate models in order of fallback.
 # =============================================================================
 routing:
   recipes:
+
     # =========================================================================
     # PROFILE 1: auto-balanced (default)
     # -------------------------------------------------------------------------
     # Policy:
-    # - Coding & technical tasks -> local-coder (fast iteration, free, private)
-    # - Complex reasoning & architecture -> external-frontier (maximum capability)
-    # - Lightweight greetings / chitchat -> local-fast (low latency)
-    # - Default general traffic -> external-general (balanced quality/cost)
+    # - Architecture, deep STEM & proofs -> external-frontier
+    # - Software engineering & coding -> local-coder (fast, free, private)
+    # - Casual greetings & fast QA -> local-fast
+    # - General questions & drafting -> external-general
     # =========================================================================
     - name: "auto-balanced"
-      description: "Balanced routing policy optimizing between latency, operational cost, and reasoning capability"
-      rules:
-        - name: "balanced-coding"
-          description: "Route coding, technical programming, and debugging to local coding model"
+      description: "Balanced multi-signal routing optimizing between latency, operational cost, and capability"
+      signals:
+        domains:
+          - name: "computer science"
+            description: "Programming, software systems, debugging, APIs, and infrastructure"
+          - name: "math"
+            description: "Mathematics, statistics, calculus, and quantitative reasoning"
+          - name: "engineering"
+            description: "System architecture, distributed systems, and technical problem solving"
+          - name: "general"
+            description: "General knowledge, writing, summarization, and miscellaneous topics"
+
+        embeddings:
+          - name: "architecture_design"
+            description: "Complex system design, distributed consensus, and microservices"
+            aggregation_method: "max"
+            threshold: 0.74
+            candidates:
+              - "Design a distributed rate limiter and explain failure modes"
+              - "Design a multi-region feature flag service with cache strategy and consistency trade-offs"
+              - "Plan a migration from a monolith to event-driven microservices"
+              - "Propose a consistency and replication strategy for a global payments platform"
+              - "Architect a multi-tenant telemetry pipeline capable of handling 100k events/sec"
+
+          - name: "complex_stem"
+            description: "Advanced mathematics, rigorous derivations, and scientific modeling"
+            aggregation_method: "max"
+            threshold: 0.74
+            candidates:
+              - "Derive the Navier-Stokes equations from first principles"
+              - "Prove the spectral theorem for bounded self-adjoint operators"
+              - "Solve this nonlinear second-order differential equation step by step"
+              - "Analyze qubit decoherence mechanisms in superconducting quantum circuits"
+              - "Formulate an eigenvalue decomposition proof with step-by-step rigorous logic"
+
+          - name: "code_general"
+            description: "General software development, coding, refactoring, and debugging"
+            aggregation_method: "max"
+            threshold: 0.72
+            candidates:
+              - "Write a Python function to parse JSON logs and calculate error rates"
+              - "Debug this TypeScript async/await promise resolution error"
+              - "Write an idiomatic Rust implementation of an LRU cache"
+              - "Refactor this SQL query to use window functions instead of subqueries"
+              - "Explain why this C++ memory leak occurs and how to fix it with smart pointers"
+              - "Create a Go REST handler with middleware authentication"
+
+          - name: "fast_qa"
+            description: "Simple greetings, trivia questions, and basic conversational phrases"
+            aggregation_method: "max"
+            threshold: 0.70
+            candidates:
+              - "Hi, how are you today?"
+              - "Hello there!"
+              - "Tell me a funny joke"
+              - "What is the capital of France?"
+              - "What does CPU stand for?"
+              - "Who wrote Romeo and Juliet?"
+              - "Thanks for your help!"
+
+        complexity:
+          - name: "code_task"
+            description: "Code difficulty boundary: routine helpers vs. distributed systems"
+            threshold: 0.12
+            easy:
+              candidates:
+                - "explain what this helper function does"
+                - "write a simple loop to reverse a string"
+                - "format this datetime string in Python"
+                - "convert a list of numbers to integers"
+            hard:
+              candidates:
+                - "design a fault-tolerant distributed consensus protocol"
+                - "debug a deadlock race condition under heavy thread contention"
+                - "optimize database query execution plans with indexing trade-offs"
+
+          - name: "reasoning_task"
+            description: "Reasoning difficulty: direct answers vs. multi-step deductive proofs"
+            threshold: 0.12
+            easy:
+              candidates:
+                - "give a short direct answer"
+                - "summarize the definition of photosynthesis"
+                - "what year did World War II end"
+            hard:
+              candidates:
+                - "compare three architectural approaches and justify the trade-offs"
+                - "build a rigorous step-by-step deductive proof from axioms"
+                - "conduct a root cause analysis from conflicting failure logs"
+
+        context:
+          - name: "short_context"
+            min_tokens: "0"
+            max_tokens: "1000"
+          - name: "long_context"
+            min_tokens: "8000"
+            max_tokens: "128000"
+
+      decisions:
+        - name: "balanced-deep-stem"
+          description: "Route advanced STEM, proofs, and architecture to frontier cloud model"
           priority: 100
           rules:
             operator: "OR"
             conditions:
-              - type: "keyword"
-                name: "coding_keywords"
-                keywords:
-                  - "code"
-                  - "python"
-                  - "rust"
-                  - "c++"
-                  - "cpp"
-                  - "javascript"
-                  - "typescript"
-                  - "golang"
-                  - "java"
-                  - "sql"
-                  - "html"
-                  - "css"
-                  - "bash"
-                  - "shell"
-                  - "git"
-                  - "debug"
-                  - "function"
-                  - "class"
-                  - "compile"
-                  - "algorithm"
-                  - "refactor"
-                  - "api"
-                  - "endpoint"
-                  - "regex"
-                  - "syntax"
-                  - "recursion"
-          modelRefs:
-            - model: "local-coder"
-            - model: "local-general"
-
-        - name: "balanced-deep-reasoning"
-          description: "Route formal math, architectural analysis, and complex proofs to cloud frontier model"
-          priority: 90
-          rules:
-            operator: "OR"
-            conditions:
-              - type: "keyword"
-                name: "reasoning_keywords"
-                keywords:
-                  - "proof"
-                  - "prove"
-                  - "theorem"
-                  - "calculus"
-                  - "differential equation"
-                  - "matrix"
-                  - "eigenvalue"
-                  - "quantum"
-                  - "step-by-step reasoning"
-                  - "formal verification"
-                  - "system architecture"
-                  - "distributed systems"
-                  - "consensus algorithm"
+              - type: "embedding"
+                name: "architecture_design"
+              - type: "embedding"
+                name: "complex_stem"
+              - type: "complexity"
+                name: "reasoning_task:hard"
           modelRefs:
             - model: "external-frontier"
             - model: "external-general"
 
-        - name: "balanced-chitchat"
-          description: "Route brief conversational greetings and simple phrases to fast local model"
-          priority: 60
+        - name: "balanced-coding-local"
+          description: "Route software engineering and coding to fast local coding model"
+          priority: 85
           rules:
             operator: "OR"
             conditions:
-              - type: "keyword"
-                name: "chitchat_keywords"
-                keywords:
-                  - "hi"
-                  - "hello"
-                  - "hey"
-                  - "how are you"
-                  - "good morning"
-                  - "good evening"
-                  - "tell me a joke"
-                  - "thanks"
-                  - "thank you"
-                  - "who are you"
-                  - "ping"
+              - type: "embedding"
+                name: "code_general"
+              - type: "domain"
+                name: "computer science"
+          modelRefs:
+            - model: "local-coder"
+            - model: "local-general"
+            - model: "external-general"
+
+        - name: "balanced-fast-chitchat"
+          description: "Route brief conversational greetings and fast QA to ultra-low latency local model"
+          priority: 60
+          rules:
+            operator: "AND"
+            conditions:
+              - type: "embedding"
+                name: "fast_qa"
+              - type: "context"
+                name: "short_context"
           modelRefs:
             - model: "local-fast"
             - model: "local-general"
 
         - name: "balanced-default"
-          description: "Default fallback to external general model for general questions and writing"
+          description: "Default fallback for general knowledge, creative writing, and analysis"
           priority: 1
           rules:
             operator: "AND"
@@ -300,127 +334,104 @@ routing:
     # PROFILE 2: auto-cost
     # -------------------------------------------------------------------------
     # Policy:
-    # - Maximize local execution (zero marginal cost)
-    # - Code, chitchat, summaries, and routine text stay on-premise
-    # - Heavy reasoning/math escalates only to external-fast (low-cost cloud tier)
-    # - Avoids expensive external-frontier models entirely
-    # - Default fallback is local-general
+    # - Strict cost minimization: maximize local execution (zero marginal cost)
+    # - All coding, general conversation, text processing, and trivia stay local
+    # - Escalate to cloud only when complexity strictly demands it, targeting
+    #   the lowest-cost cloud tier (external-fast)
     # =========================================================================
     - name: "auto-cost"
-      description: "Cost-minimizing routing policy that prioritizes free local inference and low-cost cloud tiers"
-      rules:
+      description: "Cost-minimizing multi-signal routing policy prioritizing on-premise execution"
+      signals:
+        domains:
+          - name: "computer science"
+            description: "Programming and debugging"
+          - name: "general"
+            description: "General conversational tasks"
+
+        embeddings:
+          - name: "code_general"
+            aggregation_method: "max"
+            threshold: 0.70
+            candidates:
+              - "Write a Python script to automate file backups"
+              - "Debug this SQL query syntax"
+              - "Write a function to validate email addresses"
+              - "Implement binary search in C"
+
+          - name: "fast_qa"
+            aggregation_method: "max"
+            threshold: 0.68
+            candidates:
+              - "Hi, how are you?"
+              - "What is the speed of sound?"
+              - "Tell me a joke"
+              - "Thank you very much"
+
+          - name: "complex_reasoning"
+            aggregation_method: "max"
+            threshold: 0.76
+            candidates:
+              - "Perform a mathematical proof with detailed lemmas"
+              - "Synthesize conflicting scientific studies on cellular senescence"
+              - "Analyze complex regulatory exposure across multiple legal jurisdictions"
+
+        complexity:
+          - name: "general_reasoning"
+            threshold: 0.15
+            easy:
+              candidates:
+                - "provide a summary"
+                - "explain in simple terms"
+                - "short definition"
+            hard:
+              candidates:
+                - "derive proof from first principles"
+                - "conduct multi-variable optimization with constraints"
+
+      decisions:
         - name: "cost-coding-local"
-          description: "Route coding prompts to free local coder"
+          description: "Keep all software development tasks on free local hardware"
           priority: 100
           rules:
             operator: "OR"
             conditions:
-              - type: "keyword"
-                name: "coding_keywords"
-                keywords:
-                  - "code"
-                  - "python"
-                  - "rust"
-                  - "c++"
-                  - "cpp"
-                  - "javascript"
-                  - "typescript"
-                  - "golang"
-                  - "java"
-                  - "sql"
-                  - "html"
-                  - "css"
-                  - "bash"
-                  - "shell"
-                  - "git"
-                  - "debug"
-                  - "function"
-                  - "class"
-                  - "compile"
-                  - "algorithm"
-                  - "refactor"
-                  - "api"
-                  - "endpoint"
-                  - "regex"
-                  - "syntax"
-                  - "recursion"
+              - type: "embedding"
+                name: "code_general"
+              - type: "domain"
+                name: "computer science"
           modelRefs:
             - model: "local-coder"
             - model: "local-general"
 
-        - name: "cost-chitchat-fast"
-          description: "Route trivial greetings and chitchat to lowest latency local model"
-          priority: 95
+        - name: "cost-fast-chitchat"
+          description: "Route trivial greetings and chitchat to lowest-overhead local model"
+          priority: 90
           rules:
             operator: "OR"
             conditions:
-              - type: "keyword"
-                name: "chitchat_keywords"
-                keywords:
-                  - "hi"
-                  - "hello"
-                  - "hey"
-                  - "how are you"
-                  - "good morning"
-                  - "good evening"
-                  - "tell me a joke"
-                  - "thanks"
-                  - "thank you"
-                  - "who are you"
-                  - "ping"
+              - type: "embedding"
+                name: "fast_qa"
           modelRefs:
             - model: "local-fast"
             - model: "local-general"
 
-        - name: "cost-text-processing-local"
-          description: "Route summarization, translation, and text tasks to local general model"
-          priority: 80
-          rules:
-            operator: "OR"
-            conditions:
-              - type: "keyword"
-                name: "text_keywords"
-                keywords:
-                  - "summarize"
-                  - "summary"
-                  - "tldr"
-                  - "paraphrase"
-                  - "rewrite"
-                  - "translate"
-                  - "proofread"
-                  - "draft"
-          modelRefs:
-            - model: "local-general"
-            - model: "local-fast"
-
-        - name: "cost-complex-reasoning-cheap-cloud"
-          description: "Escalate hard mathematical or scientific queries only to high-efficiency, low-cost external tier"
+        - name: "cost-complex-escalation"
+          description: "Escalate hard multi-step problems only to high-efficiency, low-cost external tier"
           priority: 60
           rules:
             operator: "OR"
             conditions:
-              - type: "keyword"
-                name: "reasoning_keywords"
-                keywords:
-                  - "proof"
-                  - "prove"
-                  - "theorem"
-                  - "calculus"
-                  - "differential equation"
-                  - "matrix"
-                  - "eigenvalue"
-                  - "quantum"
-                  - "step-by-step reasoning"
-                  - "formal verification"
-                  - "system architecture"
-                  - "distributed systems"
+              - type: "embedding"
+                name: "complex_reasoning"
+              - type: "complexity"
+                name: "general_reasoning:hard"
           modelRefs:
             - model: "external-fast"
             - model: "local-reasoner"
             - model: "local-general"
 
         - name: "cost-default"
-          description: "Default fallback keeps traffic on local general model to prevent cloud spend"
+          description: "Default fallback keeps all other traffic on local general model"
           priority: 1
           rules:
             operator: "AND"
@@ -433,111 +444,109 @@ routing:
     # PROFILE 3: auto-quality
     # -------------------------------------------------------------------------
     # Policy:
-    # - Maximize response quality, depth, and reasoning capability
+    # - Quality maximization: routes to top-tier frontier and cloud specialist models
     # - Complex reasoning, STEM, and system design -> external-frontier
-    # - Programming and software engineering -> external-coder (or external-frontier)
+    # - Advanced programming -> external-coder (fallback: external-frontier)
     # - General knowledge & analysis -> external-general
-    # - Trivial chit-chat deflects to local-fast to conserve frontier quota
-    # - Default fallback is external-general / external-frontier
+    # - Only trivial greetings deflect to local-fast to preserve cloud quotas
     # =========================================================================
     - name: "auto-quality"
-      description: "Quality-maximizing routing policy prioritizing state-of-the-art frontier and specialized cloud models"
-      rules:
-        - name: "quality-deep-reasoning"
-          description: "Route advanced mathematics, proofs, system design, and research to frontier model"
+      description: "Quality-maximizing multi-signal routing policy prioritizing frontier model capabilities"
+      signals:
+        domains:
+          - name: "computer science"
+            description: "Advanced software engineering"
+          - name: "math"
+            description: "Mathematics and formal analysis"
+          - name: "engineering"
+            description: "High-level system design"
+
+        embeddings:
+          - name: "deep_reasoning"
+            aggregation_method: "max"
+            threshold: 0.72
+            candidates:
+              - "Prove the fundamental theorem of Galois theory step by step"
+              - "Analyze systemic risk in cross-border settlement protocols"
+              - "Architect a zero-trust distributed identity verification system"
+              - "Solve this stochastic optimal control problem with full derivations"
+
+          - name: "advanced_coding"
+            aggregation_method: "max"
+            threshold: 0.72
+            candidates:
+              - "Refactor this distributed microservice to implement saga transaction orchestration"
+              - "Write a custom zero-copy memory allocator in Rust with unsafe bounds checking"
+              - "Audit this smart contract for reentrancy and integer overflow vulnerabilities"
+              - "Optimize a lock-free queue using atomic memory orderings in C++20"
+
+          - name: "fast_qa"
+            aggregation_method: "max"
+            threshold: 0.72
+            candidates:
+              - "Hi"
+              - "Hello"
+              - "Tell me a joke"
+              - "Thanks"
+
+        complexity:
+          - name: "reasoning_difficulty"
+            threshold: 0.10
+            easy:
+              candidates:
+                - "short answer"
+                - "simple definition"
+            hard:
+              candidates:
+                - "comprehensive analytical report with formal proofs"
+                - "rigorous architecture design with fault tree analysis"
+
+      decisions:
+        - name: "quality-frontier-reasoning"
+          description: "Route high-complexity problems, proofs, and architecture to frontier model"
           priority: 100
           rules:
             operator: "OR"
             conditions:
-              - type: "keyword"
-                name: "reasoning_keywords"
-                keywords:
-                  - "proof"
-                  - "prove"
-                  - "theorem"
-                  - "calculus"
-                  - "differential equation"
-                  - "matrix"
-                  - "eigenvalue"
-                  - "quantum"
-                  - "step-by-step reasoning"
-                  - "formal verification"
-                  - "system architecture"
-                  - "distributed systems"
-                  - "consensus algorithm"
-                  - "trade-offs"
-                  - "comparative analysis"
-                  - "security audit"
+              - type: "embedding"
+                name: "deep_reasoning"
+              - type: "complexity"
+                name: "reasoning_difficulty:hard"
+              - type: "domain"
+                name: "math"
           modelRefs:
             - model: "external-frontier"
             - model: "external-general"
 
-        - name: "quality-advanced-coding"
-          description: "Route technical software engineering to specialized cloud coding model"
+        - name: "quality-expert-coding"
+          description: "Route software engineering and security analysis to specialized cloud coder"
           priority: 95
           rules:
             operator: "OR"
             conditions:
-              - type: "keyword"
-                name: "coding_keywords"
-                keywords:
-                  - "code"
-                  - "python"
-                  - "rust"
-                  - "c++"
-                  - "cpp"
-                  - "javascript"
-                  - "typescript"
-                  - "golang"
-                  - "java"
-                  - "sql"
-                  - "html"
-                  - "css"
-                  - "bash"
-                  - "shell"
-                  - "git"
-                  - "debug"
-                  - "function"
-                  - "class"
-                  - "compile"
-                  - "algorithm"
-                  - "refactor"
-                  - "api"
-                  - "endpoint"
-                  - "regex"
-                  - "syntax"
-                  - "recursion"
+              - type: "embedding"
+                name: "advanced_coding"
+              - type: "domain"
+                name: "computer science"
           modelRefs:
             - model: "external-coder"
             - model: "external-frontier"
             - model: "external-general"
 
         - name: "quality-chitchat-deflection"
-          description: "Route basic greetings and chit-chat to fast local model to conserve frontier quota"
-          priority: 30
+          description: "Deflect trivial conversational chit-chat to local model to conserve frontier quota"
+          priority: 40
           rules:
             operator: "OR"
             conditions:
-              - type: "keyword"
-                name: "chitchat_keywords"
-                keywords:
-                  - "hi"
-                  - "hello"
-                  - "hey"
-                  - "how are you"
-                  - "good morning"
-                  - "good evening"
-                  - "tell me a joke"
-                  - "thanks"
-                  - "thank you"
-                  - "who are you"
-                  - "ping"
+              - type: "embedding"
+                name: "fast_qa"
           modelRefs:
             - model: "local-fast"
             - model: "local-general"
 
         - name: "quality-default"
-          description: "Default fallback to external general cloud model"
+          description: "Default fallback to cloud general model"
           priority: 1
           rules:
             operator: "AND"
@@ -550,106 +559,93 @@ routing:
     # PROFILE 4: auto-local
     # -------------------------------------------------------------------------
     # Policy:
-    # - Strict containment: picks from a pool of ONLY local models
-    # - Zero cloud models in modelRefs; zero data egress
-    # - Coding & technical -> local-coder
-    # - Logic & math -> local-reasoner
-    # - Chitchat & greetings -> local-fast
-    # - Default -> local-general
+    # - Strict local containment: 100% on-premise execution across specialized local pool
+    # - Technical coding -> local-coder
+    # - Math, logic & algorithms -> local-reasoner
+    # - Fast conversational QA -> local-fast
+    # - Default fallback -> local-general
     # =========================================================================
     - name: "auto-local"
-      description: "Strictly local routing policy with zero external dependencies, guaranteeing full data containment and privacy"
-      rules:
+      description: "Strictly local multi-signal routing policy guaranteeing full privacy and zero data egress"
+      signals:
+        domains:
+          - name: "computer science"
+            description: "Programming, scripting, and developer workflows"
+          - name: "math"
+            description: "Logic, math, and quantitative reasoning"
+
+        embeddings:
+          - name: "local_code"
+            aggregation_method: "max"
+            threshold: 0.70
+            candidates:
+              - "Write a Python script to sort and deduplicate records"
+              - "Debug this bash script pipeline error"
+              - "Implement a stack using two queues in Java"
+              - "Write a Dockerfile and docker-compose service configuration"
+
+          - name: "local_reasoning"
+            aggregation_method: "max"
+            threshold: 0.70
+            candidates:
+              - "Prove that the square root of 2 is irrational"
+              - "Solve this system of linear equations"
+              - "Explain the mathematical induction principle with an example"
+              - "Find the asymptotic complexity of this recursive relation"
+
+          - name: "local_fast_qa"
+            aggregation_method: "max"
+            threshold: 0.68
+            candidates:
+              - "Hello"
+              - "Hi"
+              - "Tell me a joke"
+              - "What time is it in UTC?"
+              - "Thanks"
+
+      decisions:
         - name: "local-coding"
-          description: "Route coding and technical tasks to local coding model"
+          description: "Route programming and dev tasks to local coder"
           priority: 100
           rules:
             operator: "OR"
             conditions:
-              - type: "keyword"
-                name: "coding_keywords"
-                keywords:
-                  - "code"
-                  - "python"
-                  - "rust"
-                  - "c++"
-                  - "cpp"
-                  - "javascript"
-                  - "typescript"
-                  - "golang"
-                  - "java"
-                  - "sql"
-                  - "html"
-                  - "css"
-                  - "bash"
-                  - "shell"
-                  - "git"
-                  - "debug"
-                  - "function"
-                  - "class"
-                  - "compile"
-                  - "algorithm"
-                  - "refactor"
-                  - "api"
-                  - "endpoint"
-                  - "regex"
-                  - "syntax"
-                  - "recursion"
+              - type: "embedding"
+                name: "local_code"
+              - type: "domain"
+                name: "computer science"
           modelRefs:
             - model: "local-coder"
             - model: "local-general"
 
         - name: "local-reasoning"
-          description: "Route math, logic, and reasoning to local reasoning model"
+          description: "Route logic, math, and derivations to local reasoning specialist"
           priority: 90
           rules:
             operator: "OR"
             conditions:
-              - type: "keyword"
-                name: "reasoning_keywords"
-                keywords:
-                  - "proof"
-                  - "prove"
-                  - "theorem"
-                  - "calculus"
-                  - "differential equation"
-                  - "matrix"
-                  - "eigenvalue"
-                  - "quantum"
-                  - "step-by-step reasoning"
-                  - "formal verification"
-                  - "algorithm"
-                  - "logic"
+              - type: "embedding"
+                name: "local_reasoning"
+              - type: "domain"
+                name: "math"
           modelRefs:
             - model: "local-reasoner"
             - model: "local-general"
 
-        - name: "local-chitchat"
-          description: "Route simple greetings and conversational phrases to fast local model"
+        - name: "local-fast-chitchat"
+          description: "Route simple greetings to lightweight local model"
           priority: 50
           rules:
             operator: "OR"
             conditions:
-              - type: "keyword"
-                name: "chitchat_keywords"
-                keywords:
-                  - "hi"
-                  - "hello"
-                  - "hey"
-                  - "how are you"
-                  - "good morning"
-                  - "good evening"
-                  - "tell me a joke"
-                  - "thanks"
-                  - "thank you"
-                  - "who are you"
-                  - "ping"
+              - type: "embedding"
+                name: "local_fast_qa"
           modelRefs:
             - model: "local-fast"
             - model: "local-general"
 
         - name: "local-default"
-          description: "Default fallback to local general model"
+          description: "Default fallback to general on-premise model"
           priority: 1
           rules:
             operator: "AND"
