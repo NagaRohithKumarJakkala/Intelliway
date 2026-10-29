@@ -5,6 +5,7 @@ requests.jsonl
 .pytest_cache/
 graphify-out/
 .worktrees/
+.kilo
 
 # Docker / Podman volumes and data
 timescaledb_data/

@@ -1,11 +1,7 @@
 
-import time
-import uuid
-
 import httpx
 from fastapi import FastAPI, HTTPException
 
-from .ledger import record_request
 from .models import ChatCompletionRequest
 from .routing import (
     canonical_auto_preset,
@@ -30,21 +26,6 @@ async def health():
     }
 
 
-def _safe_record_request(**kwargs) -> bool:
-    """
-    Telemetry failure must not trigger another provider generation.
-
-    Returns True if the record was written, False otherwise.
-    """
-    try:
-        record_request(**kwargs)
-        return True
-    except Exception:
-        # Do not log request contents, credentials, or sensitive data.
-        # Durable recovery of failed writes must be added separately.
-        return False
-
-
 def _is_retryable_upstream_error(exc: Exception) -> bool:
     """Allow fallback only for eligible transient upstream failures."""
 
@@ -66,9 +47,6 @@ def _is_retryable_upstream_error(exc: Exception) -> bool:
 async def chat_completion(
     request: ChatCompletionRequest,
 ):
-    request_id = str(uuid.uuid4())
-    start = time.perf_counter()
-
     try:
         initial_model = route_request(request)
     except ValueError as exc:
@@ -120,43 +98,9 @@ async def chat_completion(
 
             continue
 
-        # The provider has succeeded. Logging is now independent
-        # of generation and cannot cause another provider call.
-        latency_ms = (
-            time.perf_counter() - start
-        ) * 1000
-
-        _safe_record_request(
-            request_id=request_id,
-            requested_model=request.model,
-            selected_model=selected_model,
-            status="success",
-            latency_ms=latency_ms,
-            attempts=attempt,
-            usage=response.get("usage"),
-        )
-
         return response
 
     # All permitted attempts failed.
-    latency_ms = (
-        time.perf_counter() - start
-    ) * 1000
-
-    _safe_record_request(
-        request_id=request_id,
-        requested_model=request.model,
-        selected_model=initial_model,
-        status="error",
-        latency_ms=latency_ms,
-        attempts=attempt,
-        failure_class=(
-            type(last_error).__name__
-            if last_error
-            else "UnknownError"
-        ),
-    )
-
     raise HTTPException(
         status_code=502,
         detail=(

@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from gateway import main
 
 
-def test_ledger_failure_does_not_generate_twice(monkeypatch):
+def test_successful_request_is_forwarded_once(monkeypatch):
     provider_calls = []
 
     async def fake_send_to_litellm(**kwargs):
@@ -17,18 +17,10 @@ def test_ledger_failure_does_not_generate_twice(monkeypatch):
             "usage": {"total_tokens": 1},
         }
 
-    def failing_record_request(**kwargs):
-        raise OSError("Simulated ledger disk failure")
-
     monkeypatch.setattr(
         main,
         "send_to_litellm",
         fake_send_to_litellm,
-    )
-    monkeypatch.setattr(
-        main,
-        "record_request",
-        failing_record_request,
     )
 
     client = TestClient(main.app)
