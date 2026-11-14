@@ -10,7 +10,7 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - STORE_MODEL_IN_DB=True
     command:
       - "--config"
@@ -18,23 +18,23 @@ services:
       - "--port"
       - "4000"
     depends_on:
-      timescaledb:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     networks:
       - litellm-net
 
-  timescaledb:
-    image: timescale/timescaledb:latest-pg17
-    container_name: litellm-timescaledb
+  postgres:
+    image: postgres:17-alpine
+    container_name: litellm-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - timescaledb_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -59,7 +59,7 @@ services:
       - litellm-net
 
 volumes:
-  timescaledb_data:
+  postgres_data:
   redis_data:
 
 networks:

@@ -2,13 +2,13 @@
 name = "ai-gateway"
 version = "0.1.0"
 description = "FastAPI gateway in front of LiteLLM"
-readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi==0.142.2",
   "httpx==0.28.1",
   "pydantic==2.13.5",
   "pytest==9.1.1",
+  "typesafe-sdk>=0.7.5",
   "uvicorn==0.54.0",
 ]
 

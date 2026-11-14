@@ -3,7 +3,6 @@ requests.jsonl
 .env
 .venv/
 .pytest_cache/
-graphify-out/
 .worktrees/
 .kilo
 

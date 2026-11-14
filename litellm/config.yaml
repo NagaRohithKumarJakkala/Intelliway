@@ -1,29 +1,55 @@
 model_list:
-
-  # -----------------------------
-  # Local Ollama model (optional)
-  # -----------------------------
+  # Local Ollama aliases. Install these model tags in Ollama before use.
   - model_name: local-general
     litellm_params:
-      model: ollama/qwen2.5:1.5b
+      model: ollama/gemma4
       api_base: os.environ/OLLAMA_BASE_URL
 
-  # -----------------------------
-  # External Gemini model
-  # -----------------------------
-  - model_name: external-general
+  - model_name: ornith
     litellm_params:
-      model: gemini/gemini-3.8-flash
-      api_key: os.environ/GEMINI_API_KEY
+      model: ollama/ornith
+      api_base: os.environ/OLLAMA_BASE_URL
 
-  # -----------------------------
-  # Deterministic mock provider
-  # -----------------------------
-  # - model_name: mock-general
-  #   litellm_params:
-  #     model: openai/mock-model
-  #     api_base: http://127.0.0.1:9000/v1
-  #     api_key: mock-key
+  # OpenRouter aliases. OPENROUTER_API_KEY is required for external calls.
+  - model_name: gpt-6-luna
+    litellm_params:
+      model: openrouter/openai/gpt-6-luna
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: gpt-6.1-terra
+    litellm_params:
+      model: openrouter/openai/gpt-6.1-terra
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: gemini-3.5-flash-lite
+    litellm_params:
+      model: openrouter/google/gemini-3.5-flash-lite
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: gemini-3.8-flash
+    litellm_params:
+      model: openrouter/google/gemini-3.8-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: deepseek-v4.1-flash-1017
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4.1-flash-1017
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: glm-5.3-flash
+    litellm_params:
+      model: openrouter/z-ai/glm-5.3-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: glm-5.3
+    litellm_params:
+      model: openrouter/z-ai/glm-5.3
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: claude-haiku-5.5
+    litellm_params:
+      model: openrouter/anthropic/claude-haiku-5.5
+      api_key: os.environ/OPENROUTER_API_KEY
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
