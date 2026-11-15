@@ -1,249 +1,455 @@
 # Intelliway
 
-An OpenAI-compatible AI gateway and routing layer built with FastAPI, LiteLLM, vLLM Semantic Router, Redis, and TimescaleDB.
+Intelliway is an OpenAI-compatible AI gateway built from FastAPI, LiteLLM,
+vLLM Semantic Router, Ollama, Redis, and TimescaleDB.
 
----
+This project exposes three API surfaces:
 
-## Architecture Overview
+| Surface | URL | Use it for |
+|---|---|---|
+| LiteLLM Proxy | `http://localhost:4000` | The complete LiteLLM API, model aliases, provider integrations, tools, streaming, usage, spend tracking, caching, and the dashboard |
+| Semantic Router | `http://localhost:8899` | Automatic model selection using `auto`, `auto-local`, `auto-cost`, or `auto-quality` |
+| FastAPI Gateway | `http://localhost:8000` | The repository's narrow compatibility API, fallback behavior, and JSONL request ledger |
 
-| Component | Port | Technology | Description |
-|---|---|---|---|
-| **API Gateway** (`gateway`) | `8000` | FastAPI, httpx, Pydantic | Ingress proxy handling request routing, retries, fallbacks, and ledger logging |
-| **Semantic Router** | `8899` | vLLM Semantic Router (`vllm-sr`) | Multi-signal semantic classifier and Mixture-of-Models dispatcher |
-| **LiteLLM Proxy** | `4000` | LiteLLM | Multi-provider LLM interface (Ollama, Gemini, OpenAI, etc.) |
-| **TimescaleDB** | `5432` | PostgreSQL 17 + TimescaleDB | Persistent database for LiteLLM metrics, state, and spend tracking |
-| **Redis** | `6379` | Redis 7 (Alpine) | Response caching and rate-limiting |
+Use LiteLLM directly when you need all LiteLLM features. Use Semantic Router
+when the request should be classified and dispatched automatically.
 
----
+## 1. Prerequisites
 
-## Prerequisites
+Install:
 
-Before starting, ensure you have the following installed:
+- Docker Engine and Docker Compose v2
+- Python 3.12+ and [uv](https://docs.astral.sh/uv/) for the optional FastAPI gateway
+- Ollama for local inference, unless you only use cloud providers
 
-- **Docker** and **Docker Compose** (v2.20+ or Podman equivalent)
-- **Python 3.12+**
-- [**uv**](https://github.com/astral-sh/uv) (recommended) or standard Python `venv` + `pip`
-- *(Optional - for local inference)* [Ollama](https://ollama.ai/) installed and running on the host machine
-- *(Optional - for cloud providers)* API keys for external models (e.g. `GEMINI_API_KEY`, `OPENAI_API_KEY`)
-
----
-
-## Setup Instructions
-
-Follow these step-by-step instructions to set up and run Intelliway locally.
-
-### Step 1: Clone the Repository
+Clone the repository and enter it:
 
 ```bash
-git clone https://github.com/your-org/Intelliway.git
+git clone https://github.com/NagaRohithKumarJakkala/Intelliway.git
 cd Intelliway
 ```
 
-### Step 2: Configure Environment Variables
+## 2. Configure environment variables
 
-Copy the example environment file to `.env`:
+Create the local environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and review the configuration parameters:
+At minimum, replace the development values for:
 
-| Variable | Description | Default / Example |
-|---|---|---|
-| `LITELLM_MASTER_KEY` | Master authentication key for LiteLLM Proxy | `sk-change-me-to-a-secure-master-key` |
-| `LITELLM_SALT_KEY` | Salt key for LiteLLM encryption | `change-me-to-a-secure-random-salt` |
-| `POSTGRES_USER` | Username for TimescaleDB | `litellm` |
-| `POSTGRES_PASSWORD` | Password for TimescaleDB | `change-me-to-a-secure-db-password` |
-| `POSTGRES_DB` | Database name for TimescaleDB | `litellm` |
-| `REDIS_PASSWORD` | Access password for Redis cache | `change-me-to-a-secure-redis-password` |
-| `OLLAMA_BASE_URL` | Base URL used by Docker to connect to host Ollama | `http://host.docker.internal:11434` *(Docker)* or `http://host.containers.internal:11434` *(Podman)* |
-| `GEMINI_API_KEY` | API Key for Google Gemini (required for `external-*` models) | `AIzaSy...` (optional) |
-| `OPENAI_API_KEY` | API Key for OpenAI models | `sk-...` (optional) |
-| `LITELLM_URL` | Upstream LiteLLM Proxy endpoint for the Gateway | `http://127.0.0.1:4000` |
-| `SEMANTIC_ROUTER_URL` | Upstream vLLM Semantic Router endpoint for the Gateway | `http://127.0.0.1:8899` |
+```dotenv
+LITELLM_MASTER_KEY=sk-your-secure-master-key
+LITELLM_SALT_KEY=your-secure-random-salt
+POSTGRES_PASSWORD=your-secure-db-password
+REDIS_PASSWORD=your-secure-redis-password
+```
 
-> [!TIP]
-> On **Linux** with Docker, `host.docker.internal` is supported in Docker Engine 20.10+ by default. If your containers cannot resolve the host, add `--add-host=host.docker.internal:host-gateway` or set `OLLAMA_BASE_URL=http://172.17.0.1:11434`.
+For the default local models, Docker LiteLLM connects to Ollama on the host
+through:
 
----
+```dotenv
+OLLAMA_BASE_URL=http://host.docker.internal:11434
+```
 
-### Step 3: Start Infrastructure Services
+For OpenRouter GLM models, add:
 
-Start LiteLLM Proxy, TimescaleDB, Redis, and vLLM Semantic Router using Docker Compose:
+```dotenv
+OPENROUTER_API_KEY=your-openrouter-key
+```
+
+For other providers, add the corresponding key, for example
+`GEMINI_API_KEY` or `OPENAI_API_KEY`. Never commit `.env` or API keys.
+
+## 3. Start the services
+
+If using local inference, start Ollama and pull the configured model:
+
+```bash
+ollama serve
+ollama pull qwen2.5:1.5b
+ollama list
+```
+
+Start LiteLLM, its database and cache, and Semantic Router:
 
 ```bash
 docker compose up -d
-```
-
-Check the health and status of all running services:
-
-```bash
 docker compose ps
 ```
 
-All 4 services should report `running` (and `healthy` for TimescaleDB and Redis):
-```
-NAME                   IMAGE                                                STATUS
-litellm-proxy          ghcr.io/berriai/litellm:latest                       Up (running)
-litellm-redis          redis:7-alpine                                       Up (healthy)
-litellm-timescaledb    timescale/timescaledb:latest-pg17                    Up (healthy)
-vllm-semantic-router   ghcr.io/vllm-project/semantic-router/vllm-sr:latest   Up (running)
-```
+Expected services:
 
-To tail container logs:
+- `litellm-proxy` on port `4000`
+- `vllm-semantic-router` on port `8899`
+- `litellm-timescaledb` on port `5432`
+- `litellm-redis` on port `6379`
+
+View logs:
+
 ```bash
-docker compose logs -f semantic-router
 docker compose logs -f litellm
+docker compose logs -f semantic-router
 ```
 
----
-
-### Step 4: (Optional) Prepare Local Ollama Models
-
-If you plan to use local models without cloud API keys, ensure Ollama is serving on the host and pull the default model:
+Stop the Compose-managed services without deleting persistent data:
 
 ```bash
-# Verify Ollama is running
-ollama list
-
-# Pull the default local model
-ollama pull qwen2.5:1.5b
+docker compose down
 ```
 
-> [!NOTE]
-> By default in `litellm/config.yaml`, the local models (`local-general`, `local-coder`, `local-reasoner`, `local-fast`) point to `ollama/qwen2.5:1.5b`. You can pull additional specialized models (e.g., `qwen2.5-coder:1.5b`, `deepseek-r1:1.5b`) and configure them in `litellm/config.yaml`.
-
----
-
-### Step 5: Install Dependencies and Start the Gateway
-
-The API Gateway runs on the host (port `8000`) and dispatches requests to the infrastructure containers.
-
-#### Option A: Using `uv` (Recommended)
-
-Install dependencies and start the gateway with auto-reload:
+Delete the database and Redis volumes only when a full reset is intended:
 
 ```bash
-# Sync environment dependencies
-uv sync
-
-# Run the FastAPI gateway
-uv run uvicorn gateway.main:app --host 0.0.0.0 --port 8000 --reload
+docker compose down -v
+docker compose up -d
 ```
 
-#### Option B: Using Standard Python `venv` & `pip`
+## 4. Check that the services work
+
+Set the LiteLLM key in the shell:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-uvicorn gateway.main:app --host 0.0.0.0 --port 8000 --reload
+KEY=$(grep '^LITELLM_MASTER_KEY=' .env | cut -d= -f2-)
 ```
 
----
-
-## Verification & Usage
-
-### 1. Gateway Health Check
-
-Verify the gateway is operational:
+Check LiteLLM:
 
 ```bash
-curl http://localhost:8000/health
+curl -sS http://localhost:4000/health/liveliness
+curl -sS http://localhost:4000/v1/models \
+  -H "Authorization: Bearer $KEY"
 ```
 
-Expected response:
-```json
-{"status":"ok","service":"dat-ai-gateway"}
-```
-
----
-
-### 2. Chat Completion Requests
-
-#### A. Automatic Semantic Routing (`model: "auto"`)
-
-Requests specifying automatic profiles evaluate the multi-signal routing pipeline in vLLM Semantic Router (embeddings, complexity scoring, domain classification, context length) and dispatch to the optimal model target:
-
-- `auto` / `auto-balanced`: Balanced trade-off across cost, latency, and capability.
-- `auto-cost`: Cost-minimized routing prioritizing local execution.
-- `auto-quality`: Quality-maximized routing prioritizing frontier cloud reasoning.
-- `auto-local`: Strictly local routing with guaranteed zero external data egress.
+Check Semantic Router:
 
 ```bash
-curl -X POST http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "auto",
-    "messages": [
-      {"role": "user", "content": "Write a python function to compute fibonacci numbers"}
-    ],
-    "temperature": 0.7
-  }'
+curl -sS http://localhost:8899/health
 ```
 
-#### B. Explicit Model Selection (`model: "<alias>"`)
-
-Clients can bypass semantic routing to query specific target models directly:
-- **Local Pool**: `local-general`, `local-coder`, `local-reasoner`, `local-fast`
-- **External Pool**: `external-general`, `external-frontier`, `external-coder`, `external-fast`
+Check the optional FastAPI gateway:
 
 ```bash
-curl -X POST http://localhost:8000/v1/chat/completions \
+curl -sS http://localhost:8000/health
+```
+
+## 5. Access the LiteLLM dashboard
+
+Open [http://localhost:4000/ui/](http://localhost:4000/ui/) in a browser and
+sign in with `LITELLM_MASTER_KEY`.
+
+The dashboard can be used to inspect requests, spend, keys, teams, provider
+configuration, and model activity. The file-based model aliases used by this
+repository are defined in [`litellm/config.yaml`](./litellm/config.yaml).
+Changes to that file require recreating LiteLLM:
+
+```bash
+docker compose up -d --force-recreate litellm
+```
+
+## 6. Use each API surface
+
+### A. LiteLLM directly: all LiteLLM features
+
+Use port `4000` for streaming, tools, structured output, provider-specific
+parameters, embeddings, image APIs, model management, and other LiteLLM
+features.
+
+List configured aliases:
+
+```bash
+curl -sS http://localhost:4000/v1/models \
+  -H "Authorization: Bearer $KEY"
+```
+
+Send a local request:
+
+```bash
+curl -sS http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "local-general",
-    "messages": [
-      {"role": "user", "content": "Hello, describe what an AI gateway does in one sentence."}
-    ]
+    "messages": [{"role": "user", "content": "Explain an API gateway in one sentence."}]
   }'
 ```
 
-> [!IMPORTANT]
-> **Explicit Model Invariant**: Explicit model requests never use fallbacks. If the selected provider is offline or errors, the gateway fails immediately with a `502 Bad Gateway` to preserve strict routing predictability.
+Send a GLM request through OpenRouter:
 
----
+```bash
+curl -sS http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "external-general",
+    "messages": [{"role": "user", "content": "Say hello briefly."}],
+    "max_tokens": 256
+  }'
+```
 
-### 3. Inspecting the Telemetry Ledger
+Stream a response:
 
-Every invocation records an audit log to `evidence/requests.jsonl` with request UUID, requested model, selected model, attempt count, latency, and token usage:
+```bash
+curl -N http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "local-general",
+    "messages": [{"role": "user", "content": "List three short ideas."}],
+    "stream": true
+  }'
+```
+
+### B. Semantic Router: automatic model selection
+
+The router accepts OpenAI-compatible chat requests and selects a LiteLLM alias.
+It currently routes coding keywords to `local-coder`, complex keywords to
+`external-frontier`, and ordinary text to `local-general`.
+
+```bash
+curl -sS http://localhost:8899/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "auto",
+    "messages": [{"role": "user", "content": "Write a Python function to sort a list."}]
+  }'
+```
+
+Available automatic entrypoints:
+
+| Model | Behavior |
+|---|---|
+| `auto` / `auto-balanced` | Default keyword and modality routing |
+| `auto-local` | Always selects a local model |
+| `auto-cost` | Uses the default cost-oriented recipe |
+| `auto-quality` | Uses the external frontier alias |
+
+Example quality-first request:
+
+```bash
+curl -sS http://localhost:8899/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "auto-quality",
+    "messages": [{"role": "user", "content": "Explain a distributed migration strategy."}]
+  }'
+```
+
+The router's selected alias is returned in the response `model` field.
+Routing rules and entrypoints are defined in
+[`semantic-router/config.yaml`](./semantic-router/config.yaml).
+
+### C. FastAPI Gateway: compatibility and fallback API
+
+Start it outside Docker:
+
+```bash
+uv sync
+uv run uvicorn gateway.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Then call it:
+
+```bash
+curl -sS http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "auto",
+    "messages": [{"role": "user", "content": "Write a short Python example."}]
+  }'
+```
+
+The gateway supports a restricted request schema and does not support
+streaming, tools, or arbitrary LiteLLM fields. Its supported explicit aliases
+and fallback behavior are implemented in [`gateway/main.py`](./gateway/main.py).
+For the complete LiteLLM API, call port `4000` instead.
+
+Requests recorded by the gateway are written to:
 
 ```bash
 tail -n 5 evidence/requests.jsonl
 ```
 
----
+## 7. Add a model or agent
 
-### 4. Running Automated Tests
+In this repository, an “agent” is composed of:
 
-Run the complete test suite (unit tests, failure recovery, semantic router integration, and containment checks):
+1. A LiteLLM model alias in [`litellm/config.yaml`](./litellm/config.yaml).
+2. Optionally, a Semantic Router model and decision in
+   [`semantic-router/config.yaml`](./semantic-router/config.yaml).
+3. Optionally, an explicit alias in the FastAPI gateway if it must be
+   accessible through port `8000`.
+
+### Add a LiteLLM model alias
+
+Add a new entry under `model_list`. For example, an OpenRouter model:
+
+```yaml
+- model_name: external-research
+  litellm_params:
+    model: openrouter/z-ai/glm-4.5-air
+    api_base: https://openrouter.ai/api/v1
+    api_key: os.environ/OPENROUTER_API_KEY
+    max_tokens: 4096
+```
+
+Or a second Ollama alias:
+
+```yaml
+- model_name: local-research
+  litellm_params:
+    model: ollama/qwen2.5:1.5b
+    api_base: os.environ/OLLAMA_BASE_URL
+```
+
+Restart LiteLLM and verify the alias:
+
+```bash
+docker compose up -d --force-recreate litellm
+curl -sS http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer $KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"local-research","messages":[{"role":"user","content":"Say hello."}]}'
+```
+
+### Make the alias routable by Semantic Router
+
+Add the model under `providers.models`, including a backend pointing to the
+internal LiteLLM service:
+
+```yaml
+- name: external-research
+  provider_model_id: external-research
+  api_format: openai
+  backend_refs:
+    - name: litellm-external-research
+      endpoint: litellm:4000
+      provider: openai
+      auth_header: Authorization
+      auth_prefix: ****** LITELLM_MASTER_KEY
+      weight: 100
+```
+
+Add a model card under `routing.modelCards`:
+
+```yaml
+- name: external-research
+  context_window_size: 131072
+  capabilities: [chat, tools]
+```
+
+Add a decision to route a signal to it:
+
+```yaml
+- name: research_external
+  description: Route research requests to the research alias.
+  priority: 80
+  rules:
+    operator: OR
+    conditions:
+      - type: keyword
+        name: research
+  modelRefs:
+    - model: external-research
+  algorithm:
+    type: static
+```
+
+Define the matching keyword signal in `routing.signals.keywords`, then recreate
+the router:
+
+```bash
+docker compose up -d --force-recreate semantic-router
+docker compose logs --tail 100 semantic-router
+```
+
+The router-to-LiteLLM endpoint must be `litellm:4000`, not
+`http://localhost:4000` and not a `/v1` URL.
+
+### Expose the alias through the FastAPI Gateway
+
+The FastAPI gateway intentionally maintains an allowlist. Add the alias to
+`EXPLICIT_MODELS` in [`gateway/routing.py`](./gateway/routing.py) and ensure
+the request path is appropriate for the gateway's restricted schema. Restart
+the gateway after changing Python files.
+
+For tools, streaming, structured output, or provider-specific fields, do not
+add the request to the gateway; use LiteLLM directly.
+
+## 8. Configure routing behavior
+
+The default routing signals are in
+[`semantic-router/config.yaml`](./semantic-router/config.yaml):
+
+- `coding`: `code`, `python`, `function`, `class`, `debug`, and similar terms
+- `complex`: `architecture`, `distributed`, `prove`, `derive`, `optimize`,
+  and `migration`
+
+Decision priority is highest first. A coding request therefore selects
+`local-coder` before the default local decision. Keep model aliases consistent
+between both YAML files.
+
+## 9. Tests and validation
+
+Run the test suite:
 
 ```bash
 uv run pytest
 ```
 
----
+Validate Compose configuration:
 
-## Customizing Routing Policies
-
-For detailed guides on defining anchor utterances, cosine thresholds, model pools, and priority recipes in vLLM Semantic Router, see [`semantic-router/README.md`](semantic-router/README.md).
-
----
-
-## Troubleshooting
-
-### Container cannot reach host Ollama (`Connection refused`)
-- **Docker on Linux**: Make sure your firewall allows traffic on `172.17.0.1:11434` or set `OLLAMA_HOST=0.0.0.0` when running `ollama serve`.
-- **Podman**: Ensure `OLLAMA_BASE_URL=http://host.containers.internal:11434` is set in `.env`.
-- **macOS/Windows**: `host.docker.internal` resolves automatically in Docker Desktop.
-
-### Port Conflicts
-Ensure ports `8000` (Gateway), `4000` (LiteLLM), `8899` (Semantic Router), `5432` (TimescaleDB), and `6379` (Redis) are available on your host before running `docker compose up -d`.
-
-### Resetting Infrastructure State
-To wipe all stored database metrics and Redis cache:
 ```bash
-docker compose down -v
-docker compose up -d
+docker compose config
 ```
+
+Check configuration changes after editing:
+
+```bash
+docker compose up -d --force-recreate litellm semantic-router
+docker compose ps
+docker compose logs --tail 100 litellm semantic-router
+```
+
+## 10. Troubleshooting
+
+### OpenRouter returns HTTP 402
+
+Confirm `OPENROUTER_API_KEY` is present in `.env`, use a small
+`max_tokens` value, and check the OpenRouter account balance or limits. The
+default GLM aliases cap output at `4096` tokens.
+
+### Container cannot connect to Ollama
+
+Verify Ollama is running and listening on a host-reachable address:
+
+```bash
+ollama list
+curl http://localhost:11434/api/tags
+```
+
+Docker uses `host.docker.internal`; Podman generally uses
+`host.containers.internal`. Update `OLLAMA_BASE_URL` in `.env` accordingly.
+
+### Router cannot reach LiteLLM
+
+Check both services and use the internal hostname:
+
+```bash
+docker compose ps
+docker compose logs --tail 100 semantic-router
+```
+
+Router backends must use `endpoint: litellm:4000`.
+
+### Port conflict
+
+The default ports are `4000`, `8899`, `8000`, `5432`, and `6379`. Stop the
+conflicting process or change the host-side port in `docker-compose.yml`.
+
+### Stale network or orphan-container warning
+
+The gateway and Ollama may be managed outside this Compose project. The warning
+is safe if those containers are still needed. Do not use
+`--remove-orphans` unless those external containers should be removed.

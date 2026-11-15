@@ -1,0 +1,8 @@
+.env
+.git
+.venv
+gateway/.venv
+__pycache__
+.pytest_cache
+evidence/*.jsonl
+*.pyc

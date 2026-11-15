@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Intelliway Chat</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #10131a; color: #eef2f7; }
+    main { width: min(900px, 100%); min-height: 100vh; margin: auto; display: flex; flex-direction: column; padding: 18px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    h1 { font-size: 1.15rem; margin: 0; } .muted { color: #9aa5b5; font-size: .85rem; }
+    #messages { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 28px 0; }
+    .message { max-width: 82%; padding: 11px 14px; border-radius: 12px; white-space: pre-wrap; line-height: 1.45; }
+    .user { align-self: flex-end; background: #2558a8; } .assistant { align-self: flex-start; background: #202734; }
+    .metadata { margin-top: 7px; color: #9aa5b5; font-size: .75rem; white-space: normal; }
+    .empty { margin: auto; color: #8d98a8; text-align: center; }
+    form { background: #181e28; border: 1px solid #2d3747; border-radius: 14px; padding: 10px; }
+    textarea { width: 100%; resize: vertical; min-height: 64px; background: transparent; border: 0; color: inherit; outline: 0; font: inherit; }
+    .controls { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    select, button { border: 1px solid #3b475a; border-radius: 8px; background: #222b39; color: inherit; padding: 8px 10px; }
+    select { flex: 1; } button { cursor: pointer; } button:hover { background: #2b3a50; } button:disabled { opacity: .5; cursor: wait; }
+    @media (max-width: 600px) { main { padding: 12px; } .message { max-width: 94%; } }
+  </style>
+</head>
+<body>
+<main>
+  <header><div><h1>Intelliway Chat</h1><span class="muted">Choose a route and send a message</span></div><button id="clear" type="button">Clear</button></header>
+  <section id="messages"><div class="empty">Start a conversation</div></section>
+  <form id="chat-form">
+    <textarea id="prompt" placeholder="Ask anything..." required></textarea>
+    <div class="controls"><select id="model" aria-label="Model"></select><button id="send" type="submit">Send</button></div>
+  </form>
+</main>
+<script>
+  const messages = document.querySelector("#messages");
+  const form = document.querySelector("#chat-form");
+  const prompt = document.querySelector("#prompt");
+  const model = document.querySelector("#model");
+  const send = document.querySelector("#send");
+  let history = [];
+
+  fetch("/api/options").then(r => r.json()).then(data => {
+    data.options.forEach(option => {
+      const item = document.createElement("option");
+      item.value = option.id; item.textContent = option.label; model.append(item);
+    });
+  });
+
+  function addMessage(role, content) {
+    messages.querySelector(".empty")?.remove();
+    const node = document.createElement("div");
+    node.className = `message ${role}`;
+    node.textContent = content;
+    messages.append(node);
+    node.scrollIntoView({ behavior: "smooth", block: "end" });
+    return node;
+  }
+
+  function addMetadata(node, response) {
+    const usage = response.usage || {};
+    const details = [];
+    if (response.model) details.push(`Model: ${response.model}`);
+    if (Number.isFinite(usage.prompt_tokens)) details.push(`Prompt: ${usage.prompt_tokens} tokens`);
+    if (Number.isFinite(usage.completion_tokens)) details.push(`Response: ${usage.completion_tokens} tokens`);
+    if (Number.isFinite(usage.total_tokens)) details.push(`Total: ${usage.total_tokens} tokens`);
+    if (!details.length) details.push("Usage unavailable");
+    const metadata = document.createElement("div");
+    metadata.className = "metadata";
+    metadata.textContent = details.join(" · ");
+    node.append(metadata);
+  }
+
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const content = prompt.value.trim();
+    if (!content || send.disabled) return;
+    prompt.value = ""; send.disabled = true;
+    history.push({ role: "user", content }); addMessage("user", content);
+    const answer = addMessage("assistant", "Thinking...");
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: model.value, messages: history })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Request failed");
+      const reply = data.choices?.[0]?.message?.content || "No response content returned.";
+      answer.textContent = reply;
+      addMetadata(answer, data);
+      history.push({ role: "assistant", content: reply });
+    } catch (error) {
+      answer.textContent = `Error: ${error.message}`; history.pop();
+    } finally { send.disabled = false; prompt.focus(); }
+  });
+  document.querySelector("#clear").addEventListener("click", () => {
+    history = []; messages.innerHTML = '<div class="empty">Start a conversation</div>'; prompt.focus();
+  });
+</script>
+</body>
+</html>

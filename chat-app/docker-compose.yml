@@ -1,0 +1,15 @@
+services:
+  chat-app:
+    build: .
+    container_name: intelliway-chat-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      LITELLM_BASE_URL: ${CHAT_LITELLM_BASE_URL:-http://host.docker.internal:4000}
+      SEMANTIC_ROUTER_BASE_URL: ${CHAT_SEMANTIC_ROUTER_BASE_URL:-http://host.docker.internal:8899}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-}
+      CHAT_MAX_TOKENS: ${CHAT_MAX_TOKENS:-4096}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

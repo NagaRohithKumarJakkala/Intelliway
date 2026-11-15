@@ -12,6 +12,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
       - STORE_MODEL_IN_DB=True
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command:
       - "--config"
       - "/app/config.yaml"
@@ -68,6 +70,10 @@ services:
       - ./semantic-router/config.yaml:/app/config/config.yaml:ro
     environment:
       - CONFIG_FILE=/app/config/config.yaml
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    command:
+      - "--gateway=standalone"
     depends_on:
       - litellm
     networks:
