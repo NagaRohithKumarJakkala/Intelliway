@@ -8,6 +8,7 @@ from typesafe_sdk import ChoiceAnswer
 
 from gateway import main, routing
 from gateway.routing_config import RoutingConfig
+from gateway.upstream import LiteLLMResponse
 
 
 RESPONSE = {
@@ -74,7 +75,7 @@ def jev(monkeypatch):
 @pytest.fixture
 def config():
     aliases = [
-        "local-general",
+        "gemma4",
         "external-general",
         "frontier-a",
         "frontier-b",
@@ -91,8 +92,8 @@ def config():
             for rank, alias in enumerate(aliases)
         },
         pools={
-            "auto-cost": ["local-general", "external-general"],
-            "auto-balanced": ["external-general", "local-general"],
+            "auto-cost": ["gemma4", "external-general"],
+            "auto-balanced": ["external-general", "gemma4"],
             "auto-quality": ["frontier-a", "frontier-b", "frontier-c"],
         },
     )
@@ -115,7 +116,7 @@ def provider(monkeypatch):
             error = state.errors.pop(0)
             if error is not None:
                 raise error
-        return RESPONSE
+        return LiteLLMResponse(RESPONSE, {})
 
     monkeypatch.setattr(main, "send_to_litellm", send)
     return state
@@ -138,11 +139,14 @@ def test_successful_request_is_forwarded_once(monkeypatch, client):
     async def fake_send_to_litellm(**kwargs):
         provider_calls.append(kwargs["model"])
 
-        return {
-            "id": "test-response",
-            "choices": [],
-            "usage": {"total_tokens": 1},
-        }
+        return LiteLLMResponse(
+            {
+                "id": "test-response",
+                "choices": [],
+                "usage": {"total_tokens": 1},
+            },
+            {},
+        )
 
     monkeypatch.setattr(
         main,
@@ -173,11 +177,14 @@ def test_request_without_auth_header_is_allowed(monkeypatch, client):
 
     async def fake_send_to_litellm(**kwargs):
         provider_calls.append(kwargs["model"])
-        return {
-            "id": "test-response-unauthenticated",
-            "choices": [],
-            "usage": {"total_tokens": 1},
-        }
+        return LiteLLMResponse(
+            {
+                "id": "test-response-unauthenticated",
+                "choices": [],
+                "usage": {"total_tokens": 1},
+            },
+            {},
+        )
 
     monkeypatch.setattr(
         main,
@@ -208,7 +215,7 @@ def test_streaming_is_rejected_before_provider_call(monkeypatch, client):
 
     async def fake_send_to_litellm(**kwargs):
         provider_calls.append(kwargs)
-        return {}
+        return LiteLLMResponse({}, {})
 
     monkeypatch.setattr(
         main,
@@ -261,7 +268,7 @@ def test_auto_local_does_not_fall_back_to_external_model(monkeypatch, client):
     )
 
     assert response.status_code == 502
-    assert provider_calls == ["local-general"]
+    assert provider_calls == ["gemma4"]
 
 
 @pytest.mark.parametrize("model", ["external-general", "frontier-a", "auto-local"])
@@ -273,7 +280,7 @@ def test_explicit_and_local_bypass_jev_without_credentials(
     assert response.status_code == 200
     assert response.json() == RESPONSE
     assert [call["model"] for call in provider.calls] == [
-        "local-general" if model == "auto-local" else model
+        "gemma4" if model == "auto-local" else model
     ]
     assert jev.constructors == []
     assert jev.calls == []
@@ -388,8 +395,8 @@ def test_invalid_jev_answers_fail_closed(client, provider, jev, result):
 @pytest.mark.parametrize(
     ("model", "selected", "preset"),
     [
-        ("auto", "local-general", "auto-balanced"),
-        ("auto-balanced", "local-general", "auto-balanced"),
+        ("auto", "gemma4", "auto-balanced"),
+        ("auto-balanced", "gemma4", "auto-balanced"),
         ("auto-cost", "external-general", "auto-cost"),
         ("auto-quality", "frontier-b", "auto-quality"),
     ],
@@ -506,7 +513,7 @@ def test_explicit_and_local_remain_strict_on_transient_errors(
     assert response.status_code == 502
     assert SECRET not in response.text
     assert [call["model"] for call in provider.calls] == [
-        "local-general" if model == "auto-local" else model
+        "gemma4" if model == "auto-local" else model
     ]
     assert jev.constructors == []
 

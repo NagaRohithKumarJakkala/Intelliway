@@ -37,7 +37,7 @@ def make_request(
 
 @pytest.fixture
 def config():
-    aliases = ["local-general", "cheap", "general", "frontier-a", "frontier-b"]
+    aliases = ["gemma4", "cheap", "general", "frontier-a", "frontier-b"]
     return RoutingConfig(
         catalogue={
             alias: {
@@ -49,8 +49,8 @@ def config():
             for rank, alias in enumerate(aliases)
         },
         pools={
-            "auto-cost": ["local-general", "cheap"],
-            "auto-balanced": ["cheap", "general", "local-general"],
+            "auto-cost": ["gemma4", "cheap"],
+            "auto-balanced": ["cheap", "general", "gemma4"],
             "auto-quality": ["frontier-a", "frontier-b"],
         },
     )
@@ -90,9 +90,9 @@ def answer(alias):
 @pytest.mark.parametrize(
     "model,selected",
     [
-        ("local-general", "local-general"),
+        ("gemma4", "gemma4"),
         ("general", "general"),
-        ("auto-local", "local-general"),
+        ("auto-local", "gemma4"),
     ],
 )
 def test_direct_routes_bypass_jev(model, selected, config, jev, monkeypatch):

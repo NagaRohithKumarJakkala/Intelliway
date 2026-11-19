@@ -70,7 +70,7 @@ async def route_request(
     if preset is None:
         raise UnknownModelError("Unknown model alias.")
     if preset == "auto-local":
-        return RoutingDecision("local-general", ("local-general",))
+        return RoutingDecision("gemma4", ("gemma4",))
 
     candidates = config.pools[preset]
     if not candidates:

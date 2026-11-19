@@ -41,10 +41,8 @@ class RoutingConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_policy(self) -> Self:
-        if "local-general" not in self.catalogue:
-            raise ValueError(
-                "catalogue must configure local-general for direct local routing"
-            )
+        if "gemma4" not in self.catalogue:
+            raise ValueError("catalogue must configure gemma4 for direct local routing")
         if any(not alias or alias.strip() != alias for alias in self.catalogue):
             raise ValueError(
                 "catalogue aliases must be nonempty and have no surrounding whitespace"
@@ -106,7 +104,7 @@ def load_routing_config() -> RoutingConfig:
             "and description plus input_cost_per_million_usd and "
             "output_cost_per_million_usd (nonnegative finite numbers or null if unknown), "
             "with no extra fields. "
-            "Include local-general and do not use reserved auto aliases as catalogue keys. "
+            "Include gemma4 and do not use reserved auto aliases as catalogue keys. "
             "Define exactly auto-cost, auto-balanced, and auto-quality as ordered lists "
             "of unique known aliases (maximum 255 each); pools may be empty until configured. "
             "Correct the configuration and restart the gateway."

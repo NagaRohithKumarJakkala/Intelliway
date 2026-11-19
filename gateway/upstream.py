@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 
 import httpx
 
@@ -7,6 +8,23 @@ LITELLM_URL = os.getenv(
     "LITELLM_URL",
     "http://127.0.0.1:4000",
 )
+
+ALLOWED_RESPONSE_HEADERS = frozenset(
+    {
+        "x-litellm-response-cost",
+        "x-litellm-call-id",
+        "x-litellm-model-id",
+        "x-litellm-model-group",
+        "x-litellm-version",
+        "x-litellm-cache-key",
+    }
+)
+
+
+@dataclass(frozen=True)
+class LiteLLMResponse:
+    body: dict
+    headers: dict[str, str]
 
 
 async def send_to_litellm(
@@ -41,4 +59,11 @@ async def send_to_litellm(
 
     response.raise_for_status()
 
-    return response.json()
+    return LiteLLMResponse(
+        body=response.json(),
+        headers={
+            key: value
+            for key, value in response.headers.items()
+            if key.lower() in ALLOWED_RESPONSE_HEADERS
+        },
+    )

@@ -11,7 +11,7 @@ from gateway.routing_config import RoutingConfig, load_routing_config
 def policy():
     return {
         "catalogue": {
-            "local-general": {
+            "gemma4": {
                 "identity": "local/model",
                 "description": "Small local text model.",
                 "input_cost_per_million_usd": 0,
@@ -25,8 +25,8 @@ def policy():
             },
         },
         "pools": {
-            "auto-cost": ["local-general"],
-            "auto-balanced": ["frontier", "local-general"],
+            "auto-cost": ["gemma4"],
+            "auto-balanced": ["frontier", "gemma4"],
             "auto-quality": [],
         },
     }
@@ -49,7 +49,7 @@ def test_valid_policy_preserves_order_and_metadata(policy):
     "value", [-1, -0.01, True, False, float("nan"), float("inf"), float("-inf"), "1"]
 )
 def test_invalid_price(policy, field, value):
-    policy["catalogue"]["local-general"][field] = value
+    policy["catalogue"]["gemma4"][field] = value
     with pytest.raises(ValidationError):
         RoutingConfig.model_validate(policy)
 
@@ -59,15 +59,15 @@ def test_invalid_price(policy, field, value):
 )
 @pytest.mark.parametrize("value", [None, 0, 0.0, 0.125, 10])
 def test_valid_price_preserved(policy, field, value):
-    policy["catalogue"]["local-general"][field] = value
+    policy["catalogue"]["gemma4"][field] = value
     config = RoutingConfig.model_validate(policy)
-    assert config.catalogue["local-general"].model_dump()[field] == value
+    assert config.catalogue["gemma4"].model_dump()[field] == value
 
 
 @pytest.mark.parametrize("field", ["identity", "description"])
 @pytest.mark.parametrize("value", ["", " \n\t", 123, None])
 def test_invalid_metadata(policy, field, value):
-    policy["catalogue"]["local-general"][field] = value
+    policy["catalogue"]["gemma4"][field] = value
     with pytest.raises(ValidationError):
         RoutingConfig.model_validate(policy)
 
@@ -82,7 +82,7 @@ def test_invalid_metadata(policy, field, value):
     ],
 )
 def test_missing_entry_field(policy, field):
-    del policy["catalogue"]["local-general"][field]
+    del policy["catalogue"]["gemma4"][field]
     with pytest.raises(ValidationError):
         RoutingConfig.model_validate(policy)
 
@@ -91,7 +91,7 @@ def test_missing_entry_field(policy, field):
 def test_extra_fields_forbidden(policy, location):
     target = {
         "root": policy,
-        "entry": policy["catalogue"]["local-general"],
+        "entry": policy["catalogue"]["gemma4"],
         "pools": policy["pools"],
     }[location]
     target["unexpected"] = "not allowed"
@@ -113,15 +113,15 @@ def test_extra_fields_forbidden(policy, location):
     ],
 )
 def test_invalid_catalogue_alias(policy, alias):
-    policy["catalogue"][alias] = policy["catalogue"]["local-general"].copy()
+    policy["catalogue"][alias] = policy["catalogue"]["gemma4"].copy()
     with pytest.raises(ValidationError):
         RoutingConfig.model_validate(policy)
 
 
-def test_local_general_required(policy):
-    del policy["catalogue"]["local-general"]
+def test_gemma4_required(policy):
+    del policy["catalogue"]["gemma4"]
     policy["pools"] = {name: ["frontier"] for name in policy["pools"]}
-    with pytest.raises(ValidationError, match="local-general"):
+    with pytest.raises(ValidationError, match="gemma4"):
         RoutingConfig.model_validate(policy)
 
 
@@ -142,9 +142,9 @@ def test_automatic_pools_may_be_empty(policy, preset):
     "candidates",
     [
         ["unknown"],
-        ["local-general", "local-general"],
-        "local-general",
-        ("local-general",),
+        ["gemma4", "gemma4"],
+        "gemma4",
+        ("gemma4",),
         [1],
         None,
     ],
@@ -160,7 +160,7 @@ def test_invalid_pool_candidates(policy, candidates):
 def test_choice_limit_per_pool_not_catalogue(policy, count, preset):
     aliases = [f"model-{index}" for index in range(count)]
     for alias in aliases:
-        policy["catalogue"][alias] = policy["catalogue"]["local-general"].copy()
+        policy["catalogue"][alias] = policy["catalogue"]["gemma4"].copy()
     policy["pools"][preset] = aliases
     if count == 255:
         assert RoutingConfig.model_validate(policy).pools[preset] == aliases
@@ -207,6 +207,16 @@ def test_unreadable_override_does_not_fall_back(override, tmp_path, monkeypatch)
     monkeypatch.setenv("ROUTING_CONFIG_PATH", override)
     with pytest.raises(RuntimeError, match="Cannot read.*ROUTING_CONFIG_PATH"):
         load_routing_config()
+
+
+def test_bundled_routing_config_is_valid(tmp_path, monkeypatch):
+    monkeypatch.delenv("ROUTING_CONFIG_PATH", raising=False)
+    monkeypatch.chdir(tmp_path)
+    config = load_routing_config()
+    assert isinstance(config, RoutingConfig)
+    assert "gemma4" in config.catalogue
+    assert set(config.pools) == {"auto-cost", "auto-balanced", "auto-quality"}
+    assert all(config.pools.values())
 
 
 def test_default_uses_packaged_resource_outside_project(policy, tmp_path, monkeypatch):

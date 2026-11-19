@@ -1,7 +1,11 @@
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 import httpx
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+
+load_dotenv()
 
 from .models import ChatCompletionRequest
 from .routing import RoutingError, route_request
@@ -81,7 +85,7 @@ async def chat_completion(
 
             continue
 
-        return response
+        return JSONResponse(content=response.body, headers=response.headers)
 
     # All permitted attempts failed.
     raise HTTPException(

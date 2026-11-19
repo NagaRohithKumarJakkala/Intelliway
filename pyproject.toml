@@ -7,6 +7,7 @@ dependencies = [
   "fastapi==0.142.2",
   "httpx==0.28.1",
   "pydantic==2.13.5",
+  "python-dotenv>=1.0.1",
   "pytest==9.1.1",
   "typesafe-sdk>=0.7.5",
   "uvicorn==0.54.0",
@@ -22,4 +23,8 @@ packages = ["gateway"]
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+]
+benchmark = [
+    "pandas>=2.2",
+    "pyarrow>=18",
 ]

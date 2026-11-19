@@ -1,16 +1,16 @@
 {
   "catalogue": {
-    "local-general": {
+    "gemma4": {
       "identity": "ollama/gemma4",
       "description": "Local Gemma 4 model served through Ollama. Local hardware and energy costs are deployment-dependent and are not represented by API token prices.",
-      "input_cost_per_million_usd": null,
-      "output_cost_per_million_usd": null
+      "input_cost_per_million_usd": 0,
+      "output_cost_per_million_usd": 0
     },
     "ornith": {
       "identity": "ollama/ornith",
       "description": "Local Ornith model served through Ollama. Local hardware and energy costs are deployment-dependent and are not represented by API token prices.",
-      "input_cost_per_million_usd": null,
-      "output_cost_per_million_usd": null
+      "input_cost_per_million_usd": 0,
+      "output_cost_per_million_usd": 0
     },
     "gemini-3.5-flash-lite": {
       "identity": "google/gemini-3.5-flash-lite",
@@ -69,17 +69,18 @@
       "gemini-3.5-flash-lite"
     ],
     "auto-balanced": [
-      "local-general",
+      "gemma4",
       "ornith",
       "gemini-3.5-flash-lite",
-      "glm-5.3-flash",
       "deepseek-v4.1-flash-1017",
       "gpt-6-luna",
       "claude-haiku-5.5",
-      "gemini-3.8-flash",
-      "glm-5.3",
-      "gpt-6.1-terra"
+      "gemini-3.8-flash"
     ],
-    "auto-quality": []
+    "auto-quality": [
+      "gpt-6.1-terra",
+      "glm-5.3",
+      "gemini-3.8-flash"
+    ]
   }
 }
