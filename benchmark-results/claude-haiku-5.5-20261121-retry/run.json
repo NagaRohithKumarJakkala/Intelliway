@@ -1,0 +1,21 @@
+{
+  "manifest_fingerprint": "79e9055f273cf3397dad81ebb660c8f87f467b14033eb2dfd04100696ab68a94",
+  "endpoint": "http://127.0.0.1:8000/v1",
+  "timeout": 360,
+  "dispatch": "sequential",
+  "max_tokens": 2048,
+  "temperature": 0,
+  "stream": false,
+  "prompt_version": "mmlu-pro-zero-shot-v1",
+  "parser_version": "final-marker-v2",
+  "fixed_model": "claude-haiku-5.5",
+  "settings_fingerprint": "bd4b4c15b0bb95d714a9c2c795f39dedfa61b7f4e425fd641bb7915dd4ec3ecc",
+  "started_at": "2026-11-21T16:16:32.751696+00:00",
+  "software_version": "2",
+  "determinism": "temperature=0 does not guarantee provider/routing determinism",
+  "resume_warning": "Interrupted requests may have consumed provider work; ambiguous requests are never automatically resent",
+  "resumed_at": "2026-11-21T16:26:53.857124+00:00",
+  "ended_at": "2026-11-21T16:48:44.309463+00:00",
+  "logical_results": 500,
+  "extra_calls": 0
+}

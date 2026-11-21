@@ -912,11 +912,15 @@ def _result_fingerprint(settings: dict[str, Any]) -> str:
 
 
 async def run_async(args):
+    model = getattr(args, "model", None)
     with output_lock(Path(args.output_dir)):
         await evaluate(args)
         summarize(
             argparse.Namespace(
-                manifest=args.manifest, output_dir=args.output_dir, seed=42
+                manifest=args.manifest,
+                output_dir=args.output_dir,
+                seed=42,
+                model=model,
             )
         )
 
@@ -934,6 +938,8 @@ async def evaluate(args):
             "timeout must be finite and positive; max-tokens must be positive"
         )
     manifest = load_manifest(args.manifest)
+    model = getattr(args, "model", None)
+    presets = (model,) if model else PRESETS
     root = Path(args.output_dir)
     root.mkdir(parents=True, exist_ok=True)
     endpoint = sanitized_url(args.base_url).rstrip("/")
@@ -950,6 +956,7 @@ async def evaluate(args):
         "stream": False,
         "prompt_version": PROMPT_VERSION,
         "parser_version": PARSER_VERSION,
+        "fixed_model": model,
     }
     settings_hash = _result_fingerprint(settings)
     meta_path = root / "run.json"
@@ -988,7 +995,7 @@ async def evaluate(args):
             f"Explicit gateway bearer-key environment variable is empty: {auth_name}"
         )
     headers = {"Authorization": f"Bearer {key}"} if key else {}
-    paths = {preset: result_path(root, preset) for preset in PRESETS}
+    paths = {preset: result_path(root, preset) for preset in presets}
     recorded = {p: read_jsonl(path, repair=True) for p, path in paths.items()}
     latest = {
         p: {
@@ -1022,7 +1029,7 @@ async def evaluate(args):
         pending = json.loads(journal.read_text())
         preset, qid = pending.get("preset"), pending.get("question_id")
         if (
-            preset not in PRESETS
+            preset not in presets
             or pending.get("settings_fingerprint") != settings_hash
             or pending.get("manifest_fingerprint") != manifest["fingerprint"]
             or qid not in questions_by_id
@@ -1086,11 +1093,11 @@ async def evaluate(args):
     ) as client:
         first = manifest["questions"][0]
         # Score one request per preset before scheduling the remainder.
-        scheduled = [(first, preset) for preset in PRESETS]
+        scheduled = [(first, preset) for preset in presets]
         scheduled += [
             (q, p)
             for i, q in enumerate(manifest["questions"][1:], 1)
-            for p in (PRESETS[(i + j) % 3] for j in range(3))
+            for p in (presets[(i + j) % len(presets)] for j in range(len(presets)))
         ]
         for question, preset in scheduled:
             prior = latest[preset]
@@ -1274,7 +1281,12 @@ async def evaluate(args):
     atomic_json(meta_path, meta)
 
 
-def summary(root: Path, manifest: dict[str, Any], seed: int = 42) -> dict[str, Any]:
+def summary(
+    root: Path,
+    manifest: dict[str, Any],
+    seed: int = 42,
+    model: str | None = None,
+) -> dict[str, Any]:
     questions = {q["question_id"]: q for q in manifest["questions"]}
     metrics, comparison, pairs = {}, [], {}
 
@@ -1406,7 +1418,8 @@ def summary(root: Path, manifest: dict[str, Any], seed: int = 42) -> dict[str, A
         if meta_path.exists()
         else None
     )
-    for preset in PRESETS:
+    presets = (model,) if model else PRESETS
+    for preset in presets:
         attempts = read_jsonl(result_path(root, preset))
         records = validated_results(attempts, manifest, preset, settings_hash)
         settings_ids.update(r["settings_fingerprint"] for r in records)
@@ -1428,7 +1441,7 @@ def summary(root: Path, manifest: dict[str, Any], seed: int = 42) -> dict[str, A
                 )
                 for name, ids in groups.items()
             }
-    for left, right in itertools.combinations(PRESETS, 2):
+    for left, right in itertools.combinations(presets, 2):
         for cohort, ids in {"all": list(questions), **cohorts}.items():
             both = [
                 (
@@ -1508,7 +1521,8 @@ def bootstrap_mean(values: list[int], seed: int, rounds: int = 2000):
 def summarize(args):
     manifest = load_manifest(args.manifest)
     root = Path(args.output_dir)
-    report = summary(root, manifest, args.seed)
+    model = getattr(args, "model", None)
+    report = summary(root, manifest, args.seed, model)
     atomic_json(root / "summary.json", report)
     rows = []
     for preset, metrics in report["metrics"].items():
@@ -1571,6 +1585,10 @@ def parser():
     q.add_argument("--timeout", type=float, default=360)
     q.add_argument("--max-tokens", type=int, default=2048)
     q.add_argument(
+        "--model",
+        help="Evaluate one catalog model directly instead of the three auto presets",
+    )
+    q.add_argument(
         "--api-key-env",
         help="Name of a dedicated gateway bearer-key environment variable; no implicit .env loading",
     )
@@ -1588,6 +1606,7 @@ def parser():
     q.add_argument("--output-dir", default="benchmark-results")
     q.add_argument("--manifest", default="benchmark-results/subset.json")
     q.add_argument("--seed", type=int, default=42)
+    q.add_argument("--model", help="Summarize a fixed-model run")
     return p
 
 
