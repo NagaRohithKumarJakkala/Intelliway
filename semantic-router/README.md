@@ -24,28 +24,30 @@ The system defines 4 canonical routing profiles, with `auto` acting as an alias 
 
 | Profile | Public Names / Entrypoints | Objective | Model Pool | Default Fallback |
 |---|---|---|---|---|
-| **`auto-balanced`** (and **`auto`**) | `auto`, `auto-balanced`, `vllm-sr/auto`, `vllm-sr/auto-balanced` | Balanced trade-off across capability, latency, and operational cost. Coding runs locally; complex reasoning routes to cloud frontier. | Local + External | `external-general` |
-| **`auto-cost`** | `auto-cost`, `vllm-sr/auto-cost` | Cost minimization. Prioritizes free local inference for code, chit-chat, and text; escalates to low-cost cloud tiers only for complex queries. | Local (primary) + Low-cost External | `local-general` |
-| **`auto-quality`** | `auto-quality`, `vllm-sr/auto-quality` | Quality maximization. Prioritizes frontier cloud reasoning and specialist models for engineering and proofs. Local model used only for chitchat deflection. | External (primary) + Local (deflection only) | `external-general` |
-| **`auto-local`** | `auto-local`, `vllm-sr/auto-local` | Strict data containment & privacy. Routes exclusively among local models with zero external egress. | Strictly Local | `local-general` |
+| **`auto-balanced`** (and **`auto`**) | `auto`, `auto-balanced` | Balanced trade-off across capability, latency, and operational cost. | Gemma 4, Ornith, Gemini Lite/Flash, DeepSeek, GPT Luna, Claude Haiku | `gemma4` |
+| **`auto-cost`** | `auto-cost` | Cost-focused selection within the configured pool. | GLM Flash, DeepSeek Flash, GPT Luna, Gemini Lite | `glm-5.3-flash` |
+| **`auto-quality`** | `auto-quality` | Quality-focused selection within the configured pool. | GPT Terra, GLM 5.3, Gemini 3.8 Flash | `gpt-6.1-terra` |
+| **`auto-local`** | `auto-local` | Strict data containment and zero external egress. | Gemma 4, Ornith | `gemma4` |
 
 ---
 
 ## 2. Model Pools Architecture
 
-Intelliway logically divides models into two pools:
+Both the Semantic Router and LiteLLM use the same ten-model catalogue:
 
-### Local Model Pool (Zero marginal cost, on-premise privacy)
-- **`local-general`**: General-purpose local model (e.g., `ollama/qwen2.5:1.5b` or `qwen2.5:7b`).
-- **`local-coder`**: Specialized coding and technical programming model (e.g., `ollama/qwen2.5-coder:1.5b` or `qwen2.5-coder:7b`).
-- **`local-reasoner`**: Math and step-by-step logic specialist (e.g., `ollama/deepseek-r1:1.5b` or `deepseek-r1:7b`).
-- **`local-fast`**: Low-latency, ultra-compact local model (e.g., `ollama/qwen2.5:0.5b` or `llama3.2:1b`) for trivial greetings, classifications, and basic QA.
+### Local models
+- `gemma4` (`ollama/gemma4`)
+- `ornith` (`ollama/ornith`)
 
-### External Model Pool (Cloud-hosted, paid per token, high capacity)
-- **`external-general`**: General-purpose cloud model (e.g., `gemini/gemini-3.8-flash`, `gpt-4o-mini`).
-- **`external-frontier`**: High-reasoning cloud frontier model (e.g., `gemini/gemini-3.1-pro`, `gpt-4o`, `claude-3-7-sonnet`).
-- **`external-coder`**: Advanced cloud coding model (e.g., Claude 3.7 Sonnet / Gemini Pro for complex software engineering).
-- **`external-fast`**: High-throughput, cost-efficient cloud tier (e.g., `gemini/gemini-2.5-flash-lite`).
+### External models
+- `gemini-3.5-flash-lite`
+- `deepseek-v4.1-flash-1017`
+- `glm-5.3-flash`
+- `gpt-6-luna`
+- `claude-haiku-5.5`
+- `gemini-3.8-flash`
+- `glm-5.3`
+- `gpt-6.1-terra`
 
 ---
 

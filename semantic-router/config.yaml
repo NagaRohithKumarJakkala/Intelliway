@@ -1,5 +1,13 @@
 version: v0.3
 
+global:
+  model_catalog:
+    modules:
+      modality_detector:
+        enabled: true
+        method: classifier
+        confidence_threshold: 0.51
+
 listeners:
   - name: http-8899
     address: 0.0.0.0
@@ -8,199 +16,281 @@ listeners:
 
 providers:
   defaults:
-    model: local-general
+    model: gemma4
   models:
-    - name: local-general
-      provider_model_id: local-general
+    - name: gemma4
+      provider_model_id: gemma4
       api_format: openai
-      pricing:
-        currency: USD
-        prompt_per_1m: 0.0
-        completion_per_1m: 0.0
+      pricing: {currency: USD, prompt_per_1m: 0.0, completion_per_1m: 0.0}
       backend_refs:
-        - name: litellm-local
-          endpoint: litellm:4000
-          provider: openai
-          auth_header: Authorization
-          auth_prefix: Bearer
-          api_key_env: LITELLM_MASTER_KEY
-          weight: 100
-
-    - name: local-coder
-      provider_model_id: local-coder
+        - {name: litellm-gemma4, endpoint: litellm:4000, provider: openai, auth_header: Authorization, auth_prefix: "Bearer ", weight: 100}
+    - name: ornith
+      provider_model_id: ornith
       api_format: openai
-      pricing:
-        currency: USD
-        prompt_per_1m: 0.0
-        completion_per_1m: 0.0
+      pricing: {currency: USD, prompt_per_1m: 0.0, completion_per_1m: 0.0}
       backend_refs:
-        - name: litellm-local-coder
-          endpoint: litellm:4000
-          provider: openai
-          auth_header: Authorization
-          auth_prefix: Bearer
-          api_key_env: LITELLM_MASTER_KEY
-          weight: 100
-
-    - name: external-general
-      provider_model_id: external-general
+        - {name: litellm-ornith, endpoint: litellm:4000, provider: openai, auth_header: Authorization, auth_prefix: "Bearer ", weight: 100}
+    - name: gemini-3.5-flash-lite
+      provider_model_id: gemini-3.5-flash-lite
       api_format: openai
-      pricing:
-        currency: USD
-        prompt_per_1m: 0.075
-        completion_per_1m: 0.30
+      pricing: {currency: USD, prompt_per_1m: 0.3, completion_per_1m: 2.5}
       backend_refs:
-        - name: litellm-external-general
-          endpoint: litellm:4000
-          provider: openai
-          auth_header: Authorization
-          auth_prefix: Bearer
-          api_key_env: LITELLM_MASTER_KEY
-          weight: 100
-
-    - name: external-frontier
-      provider_model_id: external-frontier
+        - {name: litellm-gemini-lite, endpoint: litellm:4000, provider: openai, auth_header: Authorization, auth_prefix: "Bearer ", weight: 100}
+    - name: deepseek-v4.1-flash-1017
+      provider_model_id: deepseek-v4.1-flash-1017
       api_format: openai
-      pricing:
-        currency: USD
-        prompt_per_1m: 1.25
-        completion_per_1m: 5.0
+      pricing: {currency: USD, prompt_per_1m: 0.038, completion_per_1m: 0.5}
       backend_refs:
-        - name: litellm-external-frontier
-          endpoint: litellm:4000
-          provider: openai
-          auth_header: Authorization
-          auth_prefix: Bearer
-          api_key_env: LITELLM_MASTER_KEY
-          weight: 100
+        - {name: litellm-deepseek, endpoint: litellm:4000, provider: openai, auth_header: Authorization, auth_prefix: "Bearer ", weight: 100}
+    - name: glm-5.3-flash
+      provider_model_id: glm-5.3-flash
+      api_format: openai
+      pricing: {currency: USD, prompt_per_1m: 0.0399, completion_per_1m: 0.0784}
+      backend_refs:
+        - {name: litellm-glm-flash, endpoint: litellm:4000, provider: openai, auth_header: Authorization, auth_prefix: "Bearer ", weight: 100}
+    - name: gpt-6-luna
+      provider_model_id: gpt-6-luna
+      api_format: openai
+      pricing: {currency: USD, prompt_per_1m: 0.1, completion_per_1m: 0.5}
+      backend_refs:
+        - {name: litellm-gpt-luna, endpoint: litellm:4000, provider: openai, auth_header: Authorization, auth_prefix: "Bearer ", weight: 100}
+    - name: claude-haiku-5.5
+      provider_model_id: claude-haiku-5.5
+      api_format: openai
+      pricing: {currency: USD, prompt_per_1m: 0.1, completion_per_1m: 0.5}
+      backend_refs:
+        - {name: litellm-haiku, endpoint: litellm:4000, provider: openai, auth_header: Authorization, auth_prefix: "Bearer ", weight: 100}
+    - name: gemini-3.8-flash
+      provider_model_id: gemini-3.8-flash
+      api_format: openai
+      pricing: {currency: USD, prompt_per_1m: 0.825, completion_per_1m: 4.125}
+      backend_refs:
+        - {name: litellm-gemini-flash, endpoint: litellm:4000, provider: openai, auth_header: Authorization, auth_prefix: "Bearer ", weight: 100}
+    - name: glm-5.3
+      provider_model_id: glm-5.3
+      api_format: openai
+      pricing: {currency: USD, prompt_per_1m: 0.084, completion_per_1m: 3.6}
+      backend_refs:
+        - {name: litellm-glm, endpoint: litellm:4000, provider: openai, auth_header: Authorization, auth_prefix: "Bearer ", weight: 100}
+    - name: gpt-6.1-terra
+      provider_model_id: gpt-6.1-terra
+      api_format: openai
+      pricing: {currency: USD, prompt_per_1m: 1.0, completion_per_1m: 5.0}
+      backend_refs:
+        - {name: litellm-gpt-terra, endpoint: litellm:4000, provider: openai, auth_header: Authorization, auth_prefix: "Bearer ", weight: 100}
 
 routing:
   strategy: priority
   modelCards:
-    - name: local-general
+    - name: gemma4
+      description: Local general-purpose assistant for broad question answering and routine reasoning.
       context_window_size: 32768
       capabilities: [chat, tools]
-    - name: local-coder
+    - name: ornith
+      description: Local general-purpose assistant for concise answers and everyday reasoning.
       context_window_size: 32768
       capabilities: [chat, tools]
-    - name: external-general
+    - name: gemini-3.5-flash-lite
+      description: Efficient model for summaries, factual questions, and concise responses.
       context_window_size: 131072
       capabilities: [chat, tools]
-    - name: external-frontier
+    - name: deepseek-v4.1-flash-1017
+      description: Efficient model for technical questions, coding, and structured reasoning.
+      context_window_size: 131072
+      capabilities: [chat, tools]
+    - name: glm-5.3-flash
+      description: Fast, cost-focused model for routine factual questions and short explanations.
+      context_window_size: 131072
+      capabilities: [chat, tools]
+    - name: gpt-6-luna
+      description: General-purpose model for writing, knowledge questions, and balanced reasoning.
+      context_window_size: 131072
+      capabilities: [chat, tools]
+    - name: claude-haiku-5.5
+      description: Fast model for concise writing, summarization, and common knowledge questions.
+      context_window_size: 131072
+      capabilities: [chat, tools]
+    - name: gemini-3.8-flash
+      description: Fast model for knowledge questions, analysis, and synthesis across topics.
+      context_window_size: 131072
+      capabilities: [chat, tools]
+    - name: glm-5.3
+      description: Higher-capability model for complex technical and analytical reasoning.
+      context_window_size: 131072
+      capabilities: [chat, tools, reasoning]
+    - name: gpt-6.1-terra
+      description: Frontier model for difficult domain questions, multi-step reasoning, and precise synthesis.
       context_window_size: 131072
       capabilities: [chat, tools, reasoning]
 
   signals:
-    keywords:
-      - name: coding
-        operator: OR
-        method: bm25
-        keywords: [code, python, function, class, debug, algorithm, program]
-        case_sensitive: false
-        bm25_threshold: 0.1
-      - name: complex
-        operator: OR
-        method: bm25
-        keywords: [architecture, distributed, prove, derive, optimize, migration]
-        case_sensitive: false
-        bm25_threshold: 0.1
     modality:
-      - name: AR
-        description: Text-only autoregressive requests.
-      - name: DIFFUSION
-        description: Image-generation requests.
-      - name: BOTH
-        description: Requests needing both text and image generation.
+      - {name: AR, description: Text-only autoregressive requests.}
+      - {name: DIFFUSION, description: Image-generation requests.}
+      - {name: BOTH, description: Requests needing both text and image generation.}
 
   decisions:
-    - name: local_coding
-      description: Route coding requests to the local LiteLLM alias.
+    - name: cost_pool
+      description: Route cost-profile traffic within the configured cost model pool.
       priority: 100
       rules:
         operator: OR
         conditions:
-          - type: keyword
-            name: coding
+          - {type: modality, name: AR}
       modelRefs:
-        - model: local-coder
+        - {model: glm-5.3-flash}
+        - {model: deepseek-v4.1-flash-1017}
+        - {model: gpt-6-luna}
+        - {model: gemini-3.5-flash-lite}
       algorithm:
-        type: static
-
-    - name: complex_external
-      description: Route complex requests to the external LiteLLM alias.
-      priority: 90
+        type: router_dc
+        router_dc:
+          temperature: 0.2
+          min_similarity: 0.3
+          require_descriptions: true
+          use_capabilities: true
+    - name: balanced_pool
+      description: Route balanced-profile traffic within the configured balanced model pool.
+      priority: 100
       rules:
         operator: OR
         conditions:
-          - type: keyword
-            name: complex
+          - {type: modality, name: AR}
       modelRefs:
-        - model: external-frontier
+        - {model: gemma4}
+        - {model: ornith}
+        - {model: gemini-3.5-flash-lite}
+        - {model: deepseek-v4.1-flash-1017}
+        - {model: gpt-6-luna}
+        - {model: claude-haiku-5.5}
+        - {model: gemini-3.8-flash}
       algorithm:
-        type: static
-
-    - name: default_local
-      description: Route general requests to the local LiteLLM alias.
-      priority: 1
+        type: router_dc
+        router_dc:
+          temperature: 0.2
+          min_similarity: 0.3
+          require_descriptions: true
+          use_capabilities: true
+    - name: quality_pool
+      description: Route quality-profile traffic within the configured quality model pool.
+      priority: 100
       rules:
         operator: OR
         conditions:
-          - type: modality
-            name: AR
+          - {type: modality, name: AR}
       modelRefs:
-        - model: local-general
+        - {model: gpt-6.1-terra}
+        - {model: glm-5.3}
+        - {model: gemini-3.8-flash}
       algorithm:
-        type: static
+        type: router_dc
+        router_dc:
+          temperature: 0.2
+          min_similarity: 0.3
+          require_descriptions: true
+          use_capabilities: true
 
 entrypoints:
-  - model_names: [auto, auto-balanced, vllm-sr/auto, vllm-sr/auto-balanced]
-    recipe: default
-  - model_names: [auto-local, vllm-sr/auto-local]
+  - model_names: [auto, auto-balanced]
+    recipe: balanced
+  - model_names: [auto-local]
     recipe: local-only
-  - model_names: [auto-cost, vllm-sr/auto-cost]
-    recipe: default
-  - model_names: [auto-quality, vllm-sr/auto-quality]
-    recipe: quality-first
+  - model_names: [auto-cost]
+    recipe: cost
+  - model_names: [auto-quality]
+    recipe: quality
 
 recipes:
   - name: local-only
-    description: Keep automatic traffic on local LiteLLM aliases.
     routing:
       strategy: priority
       signals:
         modality:
-          - name: AR
-            description: Text-only autoregressive requests.
+          - {name: AR, description: Text-only autoregressive requests.}
       decisions:
-        - name: local_only_default
+        - name: local_default
           priority: 1
           rules:
-            operator: AND
+            operator: OR
             conditions:
-              - type: modality
-                name: AR
+              - {type: modality, name: AR}
           modelRefs:
-            - model: local-general
-          algorithm:
-            type: static
-
-  - name: quality-first
-    description: Prefer the highest quality LiteLLM alias for automatic traffic.
+            - {model: gemma4}
+          algorithm: {type: static}
+  - name: cost
     routing:
       strategy: priority
       signals:
         modality:
-          - name: AR
-            description: Text-only autoregressive requests.
+          - {name: AR, description: Text-only autoregressive requests.}
       decisions:
-        - name: quality_first_default
+        - name: cost_default
           priority: 1
           rules:
-            operator: AND
+            operator: OR
             conditions:
-              - type: modality
-                name: AR
+              - {type: modality, name: AR}
           modelRefs:
-            - model: external-frontier
+            - {model: glm-5.3-flash}
+            - {model: deepseek-v4.1-flash-1017}
+            - {model: gpt-6-luna}
+            - {model: gemini-3.5-flash-lite}
           algorithm:
-            type: static
+            type: router_dc
+            router_dc:
+              temperature: 0.2
+              min_similarity: 0.3
+              require_descriptions: true
+              use_capabilities: true
+  - name: balanced
+    routing:
+      strategy: priority
+      signals:
+        modality:
+          - {name: AR, description: Text-only autoregressive requests.}
+      decisions:
+        - name: balanced_default
+          priority: 1
+          rules:
+            operator: OR
+            conditions:
+              - {type: modality, name: AR}
+          modelRefs:
+            - {model: gemma4}
+            - {model: ornith}
+            - {model: gemini-3.5-flash-lite}
+            - {model: deepseek-v4.1-flash-1017}
+            - {model: gpt-6-luna}
+            - {model: claude-haiku-5.5}
+            - {model: gemini-3.8-flash}
+          algorithm:
+            type: router_dc
+            router_dc:
+              temperature: 0.2
+              min_similarity: 0.3
+              require_descriptions: true
+              use_capabilities: true
+  - name: quality
+    routing:
+      strategy: priority
+      signals:
+        modality:
+          - {name: AR, description: Text-only autoregressive requests.}
+      decisions:
+        - name: quality_default
+          priority: 1
+          rules:
+            operator: OR
+            conditions:
+              - {type: modality, name: AR}
+          modelRefs:
+            - {model: gpt-6.1-terra}
+            - {model: glm-5.3}
+            - {model: gemini-3.8-flash}
+          algorithm:
+            type: router_dc
+            router_dc:
+              temperature: 0.2
+              min_similarity: 0.3
+              require_descriptions: true
+              use_capabilities: true

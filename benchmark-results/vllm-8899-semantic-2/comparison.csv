@@ -1,0 +1,19 @@
+left,right,cohort,population,scheduled,paired,both_recorded,jointly_scorable,paired_coverage,jointly_scorable_coverage,complete,accuracy_delta_pp,left_only_correct,right_only_correct,bootstrap_95pp
+auto-cost,auto-balanced,all,all_scheduled,500,500,500,0,1.0,0.0,True,0,0,0,"[0, 0]"
+auto-cost,auto-balanced,all,jointly_scorable,500,0,500,0,0.0,0.0,True,,0,0,null
+auto-cost,auto-balanced,control,all_scheduled,100,100,100,0,1.0,0.0,True,0,0,0,"[0, 0]"
+auto-cost,auto-balanced,control,jointly_scorable,100,0,100,0,0.0,0.0,True,,0,0,null
+auto-cost,auto-balanced,separating,all_scheduled,400,400,400,0,1.0,0.0,True,0,0,0,"[0, 0]"
+auto-cost,auto-balanced,separating,jointly_scorable,400,0,400,0,0.0,0.0,True,,0,0,null
+auto-cost,auto-quality,all,all_scheduled,500,500,500,0,1.0,0.0,True,0,0,0,"[0, 0]"
+auto-cost,auto-quality,all,jointly_scorable,500,0,500,0,0.0,0.0,True,,0,0,null
+auto-cost,auto-quality,control,all_scheduled,100,100,100,0,1.0,0.0,True,0,0,0,"[0, 0]"
+auto-cost,auto-quality,control,jointly_scorable,100,0,100,0,0.0,0.0,True,,0,0,null
+auto-cost,auto-quality,separating,all_scheduled,400,400,400,0,1.0,0.0,True,0,0,0,"[0, 0]"
+auto-cost,auto-quality,separating,jointly_scorable,400,0,400,0,0.0,0.0,True,,0,0,null
+auto-balanced,auto-quality,all,all_scheduled,500,500,500,0,1.0,0.0,True,0,0,0,"[0, 0]"
+auto-balanced,auto-quality,all,jointly_scorable,500,0,500,0,0.0,0.0,True,,0,0,null
+auto-balanced,auto-quality,control,all_scheduled,100,100,100,0,1.0,0.0,True,0,0,0,"[0, 0]"
+auto-balanced,auto-quality,control,jointly_scorable,100,0,100,0,0.0,0.0,True,,0,0,null
+auto-balanced,auto-quality,separating,all_scheduled,400,400,400,0,1.0,0.0,True,0,0,0,"[0, 0]"
+auto-balanced,auto-quality,separating,jointly_scorable,400,0,400,0,0.0,0.0,True,,0,0,null

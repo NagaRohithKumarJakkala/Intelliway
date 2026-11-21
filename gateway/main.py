@@ -157,10 +157,10 @@ async def chat_completion(
             ) from exc
 
     # Attempt 2: Fallback to LiteLLM directly on transient Semantic Router failure
-    # For auto-local: strictly local-general (guarantees zero external data egress).
-    # For all other auto presets: local-general acts as the resilient on-premise fallback.
+    # For auto-local: strictly gemma4 (zero external data egress).
+    # For all other auto presets: gemma4 is the resilient on-premise fallback.
     attempt = 2
-    fallback = "local-general"
+    fallback = "gemma4"
     try:
         response = await send_to_litellm(
             model=fallback,

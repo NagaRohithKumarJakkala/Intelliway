@@ -1,0 +1,14 @@
+{
+  "question_id": "4693",
+  "cohort": "separating",
+  "category": "history",
+  "preset": "auto-balanced",
+  "manifest_fingerprint": "79e9055f273cf3397dad81ebb660c8f87f467b14033eb2dfd04100696ab68a94",
+  "settings_fingerprint": "e4ce84821f4ba83205d51f794fbc9145b2b8c18268e2553206ce95f80ada14b1",
+  "request_fingerprint": "605ce4c1a94a5f2886f129264c1a72bbe001ccb4fd15c2ea7f61b46a836c631b",
+  "timestamp": "2026-11-14T23:11:29.330199+00:00",
+  "dispatch_sequence": 747,
+  "attempt": 1,
+  "gold": "D",
+  "correct": null
+}

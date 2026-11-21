@@ -68,7 +68,8 @@ If using local inference, start Ollama and pull the configured model:
 
 ```bash
 ollama serve
-ollama pull qwen2.5:1.5b
+ollama pull gemma4
+ollama pull ornith
 ollama list
 ```
 
@@ -170,7 +171,7 @@ curl -sS http://localhost:4000/v1/chat/completions \
   -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "local-general",
+    "model": "gemma4",
     "messages": [{"role": "user", "content": "Explain an API gateway in one sentence."}]
   }'
 ```
@@ -182,7 +183,7 @@ curl -sS http://localhost:4000/v1/chat/completions \
   -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "external-general",
+    "model": "glm-5.3",
     "messages": [{"role": "user", "content": "Say hello briefly."}],
     "max_tokens": 256
   }'
@@ -195,7 +196,7 @@ curl -N http://localhost:4000/v1/chat/completions \
   -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "local-general",
+    "model": "gemma4",
     "messages": [{"role": "user", "content": "List three short ideas."}],
     "stream": true
   }'
@@ -203,9 +204,10 @@ curl -N http://localhost:4000/v1/chat/completions \
 
 ### B. Semantic Router: automatic model selection
 
-The router accepts OpenAI-compatible chat requests and selects a LiteLLM alias.
-It currently routes coding keywords to `local-coder`, complex keywords to
-`external-frontier`, and ordinary text to `local-general`.
+The router accepts OpenAI-compatible chat requests and selects a LiteLLM alias
+from the configured ten-model catalogue: two local Ollama models and eight
+OpenRouter models. The `auto-cost`, `auto-balanced`, and `auto-quality`
+entrypoints apply their configured model pools and RouterDC selection policy.
 
 ```bash
 curl -sS http://localhost:8899/v1/chat/completions \
@@ -271,7 +273,22 @@ Requests recorded by the gateway are written to:
 tail -n 5 evidence/requests.jsonl
 ```
 
-## 7. Add a model or agent
+## 7. Run the routing benchmark
+
+The benchmark evaluates the MMLU-Pro subset through the OpenAI-compatible
+Semantic Router endpoint. It uses `auto-cost`, `auto-balanced`, and
+`auto-quality`, with the same ten-model catalogue configured in LiteLLM and
+Semantic Router.
+
+```bash
+uv sync --group benchmark
+uv run --group benchmark python scripts/benchmark_mmlu_pro.py prepare
+uv run --group benchmark python scripts/benchmark_mmlu_pro.py run \
+  --base-url http://127.0.0.1:8899/v1
+uv run --group benchmark python scripts/benchmark_mmlu_pro.py summarize
+```
+
+## 8. Add a model or agent
 
 In this repository, an “agent” is composed of:
 

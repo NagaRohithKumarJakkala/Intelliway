@@ -23,3 +23,7 @@ packages = ["gateway"]
 dev = [
     "pytest>=9.1.1",
 ]
+benchmark = [
+    "pandas>=2.2",
+    "pyarrow>=18",
+]

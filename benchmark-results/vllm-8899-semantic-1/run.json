@@ -1,0 +1,47 @@
+{
+  "manifest_fingerprint": "79e9055f273cf3397dad81ebb660c8f87f467b14033eb2dfd04100696ab68a94",
+  "endpoint": "http://127.0.0.1:8899/v1",
+  "timeout": 360,
+  "dispatch": "sequential",
+  "max_tokens": 2048,
+  "temperature": 0,
+  "stream": false,
+  "prompt_version": "mmlu-pro-zero-shot-v1",
+  "parser_version": "final-marker-v2",
+  "settings_fingerprint": "64dcd239cca82b1c27e6bcaff32967ee9ee9960865c5666e00d52162ab3fa1af",
+  "started_at": "2026-11-21T03:48:51.840230+00:00",
+  "software_version": "2",
+  "determinism": "temperature=0 does not guarantee provider/routing determinism",
+  "resume_warning": "Interrupted requests may have consumed provider work; ambiguous requests are never automatically resent",
+  "ended_at": "2026-11-21T03:49:32.487500+00:00",
+  "stopped_early": {
+    "question_id": "4707",
+    "cohort": "separating",
+    "category": "history",
+    "preset": "auto-balanced",
+    "manifest_fingerprint": "79e9055f273cf3397dad81ebb660c8f87f467b14033eb2dfd04100696ab68a94",
+    "settings_fingerprint": "64dcd239cca82b1c27e6bcaff32967ee9ee9960865c5666e00d52162ab3fa1af",
+    "request_fingerprint": "d5e4aff263f2789c0b6ae2fdedeedc23ca5146302d37569ee981f666208f56a9",
+    "timestamp": "2026-11-21T03:49:32.049790+00:00",
+    "dispatch_sequence": 31,
+    "attempt": 1,
+    "gold": "E",
+    "correct": null,
+    "elapsed_seconds": 0.4365655319998041,
+    "telemetry": {
+      "x-litellm-call-id": "3ee25e06-d485-4020-8c08-82a832de945f",
+      "x-litellm-response-cost": "0"
+    },
+    "http_status": 404,
+    "status": "http_error",
+    "error": {
+      "message": "{\"error\": {\"type\": \"invalid_request_error\", \"code\": \"404\", \"message\": \"litellm.NotFoundError: OllamaException - {\\\"error\\\":\\\"model 'ornith' not found\\\"}\\n\\nLiteLLM: model group 'ornith' failed with the error above. No fallback was attempted.\", \"param\": null}}",
+      "status": 404
+    },
+    "ended_at": "2026-11-21T03:49:32.486431+00:00",
+    "reported_response_cost_usd": 0.0,
+    "cache_status": "unknown",
+    "estimated_uncached_generation_cost_usd": null,
+    "cost_estimate_source": null
+  }
+}

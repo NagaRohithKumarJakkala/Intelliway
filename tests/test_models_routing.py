@@ -29,22 +29,24 @@ def make_request(
 
 
 def test_explicit_local_model_is_honored():
-    request = make_request(model="local-general")
+    request = make_request(model="gemma4")
 
-    assert route_request(request) == "local-general"
+    assert route_request(request) == "gemma4"
 
 
 @pytest.mark.parametrize(
     "model_name",
     [
-        "local-general",
-        "local-coder",
-        "local-reasoner",
-        "local-fast",
-        "external-general",
-        "external-frontier",
-        "external-coder",
-        "external-fast",
+        "gemma4",
+        "ornith",
+        "gemini-3.5-flash-lite",
+        "deepseek-v4.1-flash-1017",
+        "glm-5.3-flash",
+        "gpt-6-luna",
+        "claude-haiku-5.5",
+        "gemini-3.8-flash",
+        "glm-5.3",
+        "gpt-6.1-terra",
     ],
 )
 def test_all_explicit_models_in_pool_are_honored(model_name):
@@ -54,11 +56,11 @@ def test_all_explicit_models_in_pool_are_honored(model_name):
 
 def test_explicit_external_model_is_honored_for_code():
     request = make_request(
-        model="external-general",
+        model="gemini-3.8-flash",
         content="Write Python code",
     )
 
-    assert route_request(request) == "external-general"
+    assert route_request(request) == "gemini-3.8-flash"
 
 
 def test_auto_routes_coding_request_to_local():
@@ -67,7 +69,7 @@ def test_auto_routes_coding_request_to_local():
         content="Write Python code",
     )
 
-    assert route_request(request) == "local-general"
+    assert route_request(request) == "gemma4"
 
 
 def test_auto_routes_general_request_to_external():
@@ -76,7 +78,7 @@ def test_auto_routes_general_request_to_external():
         content="Tell me a joke",
     )
 
-    assert route_request(request) == "external-general"
+    assert route_request(request) == "gemini-3.5-flash-lite"
 
 
 @pytest.mark.parametrize(
@@ -93,8 +95,8 @@ def test_non_local_presets_reuse_mock_heuristic(preset):
         content="Tell me a joke",
     )
 
-    assert route_request(coding_request) == "local-general"
-    assert route_request(general_request) == "external-general"
+    assert route_request(coding_request) == "gemma4"
+    assert route_request(general_request) == "gemini-3.5-flash-lite"
 
 
 def test_auto_is_an_alias_for_auto_balanced():
@@ -114,12 +116,12 @@ def test_auto_local_always_selects_local_model():
         content="Tell me a joke",
     )
 
-    assert route_request(request) == "local-general"
+    assert route_request(request) == "gemma4"
 
 
 def test_auto_local_has_no_external_fallback():
-    assert fallback_model("local-general", "auto-local") is None
-    assert fallback_model("external-general", "auto-local") is None
+    assert fallback_model("gemma4", "auto-local") is None
+    assert fallback_model("gemini-3.8-flash", "auto-local") is None
 
 
 @pytest.mark.parametrize(
@@ -127,7 +129,7 @@ def test_auto_local_has_no_external_fallback():
     ["auto", "auto-cost", "auto-quality", "auto-balanced"],
 )
 def test_automatic_presets_allow_external_to_local_fallback(preset):
-    assert fallback_model("external-general", preset) == "local-general"
+    assert fallback_model("gemini-3.8-flash", preset) == "gemma4"
 
 
 def test_unknown_model_alias_is_rejected():

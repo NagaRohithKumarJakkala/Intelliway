@@ -1,0 +1,19 @@
+{
+  "manifest_fingerprint": "79e9055f273cf3397dad81ebb660c8f87f467b14033eb2dfd04100696ab68a94",
+  "endpoint": "http://127.0.0.1:8000/v1",
+  "timeout": 360,
+  "dispatch": "sequential",
+  "max_tokens": 2048,
+  "temperature": 0,
+  "stream": false,
+  "prompt_version": "mmlu-pro-zero-shot-v1",
+  "parser_version": "final-marker-v2",
+  "settings_fingerprint": "e4ce84821f4ba83205d51f794fbc9145b2b8c18268e2553206ce95f80ada14b1",
+  "started_at": "2026-11-14T23:20:10.451895+00:00",
+  "software_version": "2",
+  "determinism": "temperature=0 does not guarantee provider/routing determinism",
+  "resume_warning": "Interrupted requests may have consumed provider work; ambiguous requests are never automatically resent",
+  "ended_at": "2026-11-15T02:00:16.353240+00:00",
+  "logical_results": 1500,
+  "extra_calls": 0
+}

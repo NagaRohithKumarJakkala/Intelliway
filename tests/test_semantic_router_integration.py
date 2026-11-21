@@ -25,7 +25,7 @@ def test_all_auto_presets_route_via_semantic_router(client, monkeypatch, preset)
         sr_calls.append(kwargs)
         return {
             "id": f"sr-resp-{preset}",
-            "model": "local-coder",
+            "model": "gemma4",
             "choices": [{"message": {"role": "assistant", "content": "routed content"}}],
             "usage": {"total_tokens": 15},
         }
@@ -55,7 +55,7 @@ def test_all_auto_presets_route_via_semantic_router(client, monkeypatch, preset)
     assert litellm_calls == []
 
     data = response.json()
-    assert data["model"] == "local-coder"
+    assert data["model"] == "gemma4"
     assert data["choices"][0]["message"]["content"] == "routed content"
 
 
@@ -112,7 +112,7 @@ def test_semantic_router_transient_error_falls_back_to_local_general(client, mon
         litellm_calls.append(kwargs)
         return {
             "id": "fallback-resp",
-            "model": "local-general",
+            "model": "gemma4",
             "choices": [{"message": {"role": "assistant", "content": "fallback response"}}],
             "usage": {"total_tokens": 10},
         }
@@ -131,8 +131,8 @@ def test_semantic_router_transient_error_falls_back_to_local_general(client, mon
     assert response.status_code == 200
     assert len(sr_calls) == 1
     assert len(litellm_calls) == 1
-    assert litellm_calls[0]["model"] == "local-general"
-    assert response.json()["model"] == "local-general"
+    assert litellm_calls[0]["model"] == "gemma4"
+    assert response.json()["model"] == "gemma4"
 
 
 def test_semantic_router_permanent_error_does_not_fall_back(client, monkeypatch):

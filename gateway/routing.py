@@ -2,14 +2,16 @@ from .models import ChatCompletionRequest
 
 # These aliases must match the model names configured in LiteLLM.
 EXPLICIT_MODELS = {
-    "local-general",
-    "local-coder",
-    "local-reasoner",
-    "local-fast",
-    "external-general",
-    "external-frontier",
-    "external-coder",
-    "external-fast",
+    "gemma4",
+    "ornith",
+    "gpt-6-luna",
+    "gpt-6.1-terra",
+    "gemini-3.5-flash-lite",
+    "gemini-3.8-flash",
+    "deepseek-v4.1-flash-1017",
+    "glm-5.3-flash",
+    "glm-5.3",
+    "claude-haiku-5.5",
 }
 
 AUTO_ROUTING_PRESETS = {
@@ -69,7 +71,7 @@ def route_request(request: ChatCompletionRequest) -> str:
         raise ValueError(f"Unknown model alias: {requested_model}")
 
     if preset == "auto-local":
-        return "local-general"
+        return "gemma4"
 
     # Evaluation aligns with the vLLM semantic router rules
     text = " ".join(
@@ -79,9 +81,9 @@ def route_request(request: ChatCompletionRequest) -> str:
     )
 
     if any(keyword in text for keyword in CODING_KEYWORDS):
-        return "local-general"
+        return "gemma4"
 
-    return "external-general"
+    return "gemini-3.5-flash-lite"
 
 
 def fallback_model(
@@ -91,8 +93,8 @@ def fallback_model(
     """Return the permitted fallback for the requested automatic preset."""
     if (
         canonical_auto_preset(requested_model) != "auto-local"
-        and selected_model == "external-general"
+        and selected_model not in {"gemma4", "ornith"}
     ):
-        return "local-general"
+        return "gemma4"
 
     return None

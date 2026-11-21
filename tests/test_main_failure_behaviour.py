@@ -36,7 +36,7 @@ def test_ledger_failure_does_not_generate_twice(monkeypatch):
     response = client.post(
         "/v1/chat/completions",
         json={
-            "model": "external-general",
+            "model": "gemini-3.8-flash",
             "messages": [
                 {
                     "role": "user",
@@ -48,7 +48,7 @@ def test_ledger_failure_does_not_generate_twice(monkeypatch):
 
     assert response.status_code == 200
     assert len(provider_calls) == 1
-    assert provider_calls == ["external-general"]
+    assert provider_calls == ["gemini-3.8-flash"]
 
 
 def test_request_without_auth_header_is_allowed(monkeypatch):
@@ -73,7 +73,7 @@ def test_request_without_auth_header_is_allowed(monkeypatch):
     response = client.post(
         "/v1/chat/completions",
         json={
-            "model": "external-general",
+            "model": "gemini-3.8-flash",
             "messages": [
                 {
                     "role": "user",
@@ -85,7 +85,7 @@ def test_request_without_auth_header_is_allowed(monkeypatch):
 
     assert response.status_code == 200
     assert len(provider_calls) == 1
-    assert provider_calls == ["external-general"]
+    assert provider_calls == ["gemini-3.8-flash"]
 
 
 def test_streaming_is_rejected_before_provider_call(monkeypatch):
@@ -161,7 +161,7 @@ def test_auto_local_does_not_fall_back_to_external_model(monkeypatch):
 
     assert response.status_code == 502
     assert router_calls == ["auto-local"]
-    assert provider_calls == ["local-general"]
+    assert provider_calls == ["gemma4"]
 
 
 def test_auto_preset_dispatches_to_semantic_router(monkeypatch):
@@ -172,7 +172,7 @@ def test_auto_preset_dispatches_to_semantic_router(monkeypatch):
         router_calls.append(kwargs["model"])
         return {
             "id": "sr-response-1",
-            "model": "local-coder",
+            "model": "gemma4",
             "choices": [{"message": {"role": "assistant", "content": "def hello(): pass"}}],
             "usage": {"total_tokens": 12},
         }
@@ -197,7 +197,7 @@ def test_auto_preset_dispatches_to_semantic_router(monkeypatch):
     assert response.status_code == 200
     assert router_calls == ["auto-balanced"]
     assert litellm_calls == []
-    assert response.json()["model"] == "local-coder"
+    assert response.json()["model"] == "gemma4"
 
 
 def test_auto_preset_fallback_to_litellm_on_retryable_sr_failure(monkeypatch):
@@ -232,8 +232,8 @@ def test_auto_preset_fallback_to_litellm_on_retryable_sr_failure(monkeypatch):
 
     assert response.status_code == 200
     assert router_calls == ["auto-quality"]
-    assert litellm_calls == ["local-general"]
-    assert response.json()["model"] == "local-general"
+    assert litellm_calls == ["gemma4"]
+    assert response.json()["model"] == "gemma4"
 
 
 def test_explicit_model_does_not_call_semantic_router(monkeypatch):
@@ -261,11 +261,11 @@ def test_explicit_model_does_not_call_semantic_router(monkeypatch):
     response = client.post(
         "/v1/chat/completions",
         json={
-            "model": "local-reasoner",
+            "model": "gemma4",
             "messages": [{"role": "user", "content": "1 + 1"}],
         },
     )
 
     assert response.status_code == 200
     assert router_calls == []
-    assert litellm_calls == ["local-reasoner"]
+    assert litellm_calls == ["gemma4"]
