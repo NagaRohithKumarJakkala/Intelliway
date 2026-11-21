@@ -1,0 +1,54 @@
+{
+  "id": null,
+  "uid": "intelliway-gateway",
+  "title": "Intelliway Gateway",
+  "tags": ["intelliway", "gateway"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Requests per second",
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum by (route) (rate(intelliway_gateway_http_requests_total[5m]))", "legendFormat": "{{route}}", "refId": "A"}],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+    },
+    {
+      "id": 2,
+      "title": "5xx responses per second",
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum by (route) (rate(intelliway_gateway_http_requests_total{status=~\"5..\"}[5m]))", "legendFormat": "{{route}}", "refId": "A"}],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+    },
+    {
+      "id": 3,
+      "title": "Request duration p95",
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le, route) (rate(intelliway_gateway_http_request_duration_seconds_bucket[5m])))", "legendFormat": "{{route}}", "refId": "A"}],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+    },
+    {
+      "id": 4,
+      "title": "Upstream health score",
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "intelliway_gateway_upstream_health_score", "legendFormat": "{{upstream}}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"min": 0, "max": 100, "unit": "percent"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+    },
+    {
+      "id": 5,
+      "title": "Open upstream circuits",
+      "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "intelliway_gateway_circuit_open", "legendFormat": "{{upstream}}", "refId": "A"}],
+      "gridPos": {"h": 5, "w": 24, "x": 0, "y": 16}
+    }
+  ]
+}

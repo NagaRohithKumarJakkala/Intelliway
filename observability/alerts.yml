@@ -1,0 +1,26 @@
+groups:
+  - name: intelliway-gateway
+    rules:
+      - alert: GatewayHighErrorRate
+        expr: |
+          sum(rate(intelliway_gateway_http_requests_total{status=~"5.."}[5m]))
+          / clamp_min(sum(rate(intelliway_gateway_http_requests_total[5m])), 0.001) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Gateway 5xx rate is above 5% for five minutes.
+      - alert: GatewayCircuitOpen
+        expr: intelliway_gateway_circuit_open == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: An upstream circuit breaker is open.
+      - alert: GatewayRateLimitedTraffic
+        expr: sum(rate(intelliway_gateway_http_requests_total{status="429"}[5m])) > 1
+        for: 2m
+        labels:
+          severity: info
+        annotations:
+          summary: The gateway is rejecting rate-limited requests.

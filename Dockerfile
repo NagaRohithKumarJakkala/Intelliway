@@ -9,6 +9,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 COPY gateway ./gateway
 COPY benchmarks ./benchmarks
+COPY litellm ./litellm
 
 ENV PATH="/app/.venv/bin:$PATH"
 

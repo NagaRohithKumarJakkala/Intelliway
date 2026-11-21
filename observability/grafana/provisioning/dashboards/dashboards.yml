@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: Intelliway
+    orgId: 1
+    folder: Intelliway
+    type: file
+    disableDeletion: true
+    options:
+      path: /var/lib/grafana/dashboards

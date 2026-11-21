@@ -1,0 +1,98 @@
+name: intelliway-e2e
+
+services:
+  mock-model:
+    build: ./tests/e2e/mock-model
+    ports:
+      - "127.0.0.1:28081:8080"
+    networks: [e2e-net]
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass e2e-redis-password
+    ports:
+      - "127.0.0.1:26379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "e2e-redis-password", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    networks: [e2e-net]
+
+  litellm:
+    image: ghcr.io/berriai/litellm:latest
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: sk-e2e-litellm-key
+      LITELLM_SALT_KEY: e2e-litellm-salt
+      REDIS_PASSWORD: e2e-redis-password
+    volumes:
+      - ./litellm/e2e-config.yaml:/app/config.yaml:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      mock-model:
+        condition: service_started
+    networks: [e2e-net]
+
+  gateway:
+    build: .
+    command: ["uvicorn", "gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:28000:8000"
+    environment:
+      LITELLM_URL: http://litellm:4000
+      SEMANTIC_ROUTER_URL: http://127.0.0.1:8899
+      LITELLM_MASTER_KEY: sk-e2e-litellm-key
+      GATEWAY_API_KEY: e2e-gateway-key
+      GATEWAY_AUDIT_HMAC_KEY: e2e-audit-secret
+      GATEWAY_RPM_LIMIT: "500"
+      GATEWAY_REDIS_HOST: redis
+      GATEWAY_REDIS_PASSWORD: e2e-redis-password
+      GATEWAY_CIRCUIT_FAILURES: "3"
+      GATEWAY_CIRCUIT_RESET_SECONDS: "10"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: intelliway-gateway-e2e
+    volumes:
+      - ./litellm/e2e-config.yaml:/app/litellm/config.yaml:ro
+      - e2e_evidence:/app/evidence
+    depends_on:
+      - litellm
+      - redis
+      - jaeger
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [e2e-net]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    ports:
+      - "127.0.0.1:26687:16686"
+    networks: [e2e-net]
+
+  https-proxy:
+    image: caddy:2-alpine
+    environment:
+      PUBLIC_DOMAIN: localhost
+    ports:
+      - "127.0.0.1:28080:80"
+      - "127.0.0.1:28443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - e2e_caddy_data:/data
+      - e2e_caddy_config:/config
+    depends_on:
+      - gateway
+      - litellm
+    networks: [e2e-net]
+
+volumes:
+  e2e_evidence:
+  e2e_caddy_data:
+  e2e_caddy_config:
+
+networks:
+  e2e-net:

@@ -20,12 +20,40 @@ DEFAULT_MAX_TOKENS = int(os.getenv("CHAT_MAX_TOKENS", "4096"))
 OPTIONS = [
     {"id": "auto", "label": "Auto (Semantic Router)", "endpoint": "router"},
     {"id": "auto-local", "label": "Auto Local", "endpoint": "router"},
+    {"id": "auto-balanced", "label": "Auto Balanced", "endpoint": "router"},
     {"id": "auto-quality", "label": "Auto Quality", "endpoint": "router"},
-    {"id": "local-general", "label": "Local General", "endpoint": "litellm"},
-    {"id": "local-coder", "label": "Local Coder", "endpoint": "litellm"},
-    {"id": "external-general", "label": "External GLM", "endpoint": "litellm"},
-    {"id": "external-frontier", "label": "External Frontier", "endpoint": "litellm"},
+    {"id": "gemma4", "label": "Gemma 4 (Local)", "endpoint": "litellm"},
+    {"id": "ornith", "label": "Ornith (Local)", "endpoint": "litellm"},
+    {"id": "glm-5.3", "label": "GLM 5.3", "endpoint": "litellm"},
+    {"id": "gpt-6.1-terra", "label": "GPT 6.1 Terra", "endpoint": "litellm"},
 ]
+
+
+def configured_options():
+    options = list(OPTIONS)
+    if not MASTER_KEY:
+        return options
+    try:
+        upstream = Request(
+            f"{LITELLM_URL}/v1/models",
+            headers={"Authorization": f"Bearer {MASTER_KEY}"},
+            method="GET",
+        )
+        with urlopen(upstream, timeout=10) as response:
+            payload = json.loads(response.read())
+        known = {item["id"] for item in options}
+        for model in payload.get("data", []):
+            model_id = model.get("id")
+            if model_id and model_id not in known:
+                options.append({
+                    "id": model_id,
+                    "label": f"{model_id} (LiteLLM)",
+                    "endpoint": "litellm",
+                })
+                known.add(model_id)
+    except Exception:
+        pass
+    return options
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -43,7 +71,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/api/options":
-            self.send_json(200, {"options": OPTIONS})
+            self.send_json(200, {"options": configured_options()})
             return
         if self.path in ("/", "/index.html"):
             self.serve_file(STATIC / "index.html", "text/html; charset=utf-8")
@@ -74,7 +102,7 @@ class Handler(BaseHTTPRequestHandler):
             messages = request.get("messages")
             if not isinstance(messages, list) or not messages:
                 raise ValueError("messages must be a non-empty list")
-            option = next((item for item in OPTIONS if item["id"] == model), None)
+            option = next((item for item in configured_options() if item["id"] == model), None)
             if option is None:
                 raise ValueError("unknown model option")
 
@@ -86,7 +114,7 @@ class Handler(BaseHTTPRequestHandler):
                 "max_tokens": request.get("max_tokens", DEFAULT_MAX_TOKENS),
             }
             headers = {"Content-Type": "application/json"}
-            if option["endpoint"] == "litellm" and MASTER_KEY:
+            if MASTER_KEY:
                 headers["Authorization"] = f"Bearer {MASTER_KEY}"
 
             upstream = Request(

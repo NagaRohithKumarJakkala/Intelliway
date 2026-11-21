@@ -1,0 +1,19 @@
+{$PUBLIC_DOMAIN:localhost} {
+	reverse_proxy chat-app:3000
+}
+
+api.{$PUBLIC_DOMAIN:localhost} {
+	@metrics path /metrics /metrics/*
+	respond @metrics 404
+	reverse_proxy gateway:8000 {
+		header_up X-Real-IP {http.request.remote.host}
+	}
+}
+
+litellm.{$PUBLIC_DOMAIN:localhost} {
+	reverse_proxy litellm:4000
+}
+
+router.{$PUBLIC_DOMAIN:localhost} {
+	reverse_proxy semantic-router:8899
+}

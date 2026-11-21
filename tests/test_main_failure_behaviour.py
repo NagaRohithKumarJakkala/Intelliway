@@ -5,6 +5,40 @@ from fastapi.testclient import TestClient
 from gateway import main
 
 
+def test_readiness_returns_ready_when_dependencies_are_healthy(monkeypatch):
+    async def fake_dependencies():
+        return {
+            "litellm": "ok",
+            "semantic_router": "ok",
+            "redis": "ok",
+            "database": "ok",
+        }
+
+    monkeypatch.setattr(main, "_check_readiness_dependencies", fake_dependencies)
+
+    response = TestClient(main.app).get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
+
+
+def test_readiness_returns_503_when_dependency_is_unavailable(monkeypatch):
+    async def fake_dependencies():
+        return {
+            "litellm": "unavailable",
+            "semantic_router": "ok",
+            "redis": "ok",
+            "database": "unknown",
+        }
+
+    monkeypatch.setattr(main, "_check_readiness_dependencies", fake_dependencies)
+
+    response = TestClient(main.app).get("/health/ready")
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "not_ready"
+
+
 def test_ledger_failure_does_not_generate_twice(monkeypatch):
     provider_calls = []
 
@@ -88,17 +122,33 @@ def test_request_without_auth_header_is_allowed(monkeypatch):
     assert provider_calls == ["gemini-3.8-flash"]
 
 
-def test_streaming_is_rejected_before_provider_call(monkeypatch):
+def test_gateway_api_key_is_required_when_configured(monkeypatch):
+    monkeypatch.setenv("GATEWAY_API_KEY", "gateway-secret")
+
+    client = TestClient(main.app)
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "gemma4",
+            "messages": [{"role": "user", "content": "Hello"}],
+        },
+    )
+
+    assert response.status_code == 401
+    assert "Invalid gateway API key" in response.json()["detail"]
+
+
+def test_streaming_opens_upstream_before_provider_call(monkeypatch):
     provider_calls = []
 
-    async def fake_send_to_litellm(**kwargs):
+    async def fake_open_stream_to_semantic_router(**kwargs):
         provider_calls.append(kwargs)
-        return {}
+        raise httpx.ReadTimeout("stream unavailable")
 
     monkeypatch.setattr(
         main,
-        "send_to_litellm",
-        fake_send_to_litellm,
+        "open_stream_to_semantic_router",
+        fake_open_stream_to_semantic_router,
     )
 
     client = TestClient(main.app)
@@ -117,8 +167,8 @@ def test_streaming_is_rejected_before_provider_call(monkeypatch):
         },
     )
 
-    assert response.status_code == 422
-    assert provider_calls == []
+    assert response.status_code == 502
+    assert len(provider_calls) == 1
 
 
 def test_auto_local_does_not_fall_back_to_external_model(monkeypatch):

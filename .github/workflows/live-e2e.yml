@@ -1,0 +1,29 @@
+name: Live gateway integration
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  compose-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Start live test stack
+        run: docker compose -f docker-compose.e2e.yml up -d --build --wait
+      - name: Run live gateway tests
+        run: uv run --group dev pytest tests/e2e -q
+      - name: Collect service logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.e2e.yml logs --no-color
+      - name: Stop live test stack
+        if: always()
+        run: docker compose -f docker-compose.e2e.yml down -v

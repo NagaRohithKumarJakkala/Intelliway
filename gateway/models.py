@@ -4,16 +4,28 @@ from pydantic import (
     ConfigDict,
     Field,
     field_validator,
-    model_validator,
 )
+from typing import Any
 
 
-ALLOWED_ROLES = {"system", "user", "assistant"}
+ALLOWED_ROLES = {"system", "user", "assistant", "tool"}
+
+
+class CacheOptions(BaseModel):
+    ttl: int | None = Field(default=None, gt=0)
+    s_maxage: int | None = Field(default=None, alias="s-maxage", gt=0)
+    no_cache: bool | None = Field(default=None, alias="no-cache")
+    no_store: bool | None = Field(default=None, alias="no-store")
+    use_cache: bool | None = Field(default=None, alias="use-cache")
+    namespace: str | None = None
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 
 class Message(BaseModel):
     role: str
     content: str
+    tool_call_id: str | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -23,7 +35,7 @@ class Message(BaseModel):
         if value not in ALLOWED_ROLES:
             raise ValueError(
                 "Unsupported message role. Supported roles: "
-                "system, user, assistant."
+                "system, user, assistant, tool."
             )
         return value
 
@@ -41,17 +53,11 @@ class ChatCompletionRequest(BaseModel):
         default=None,
         gt=0,
     )
+    tools: list[dict[str, Any]] | None = None
+    tool_choice: str | dict[str, Any] | None = None
+    response_format: dict[str, Any] | None = None
+    cache: CacheOptions | None = None
 
-    # Streaming is not implemented in this MVP.
     stream: bool = False
 
     model_config = ConfigDict(extra="forbid")
-
-    @model_validator(mode="after")
-    def reject_unsupported_streaming(self):
-        if self.stream:
-            raise ValueError(
-                "Streaming is not supported by this gateway yet. "
-                "Set stream=false."
-            )
-        return self

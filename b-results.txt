@@ -1,0 +1,18 @@
+warning: `VIRTUAL_ENV=gateway/.venv` does not match the project environment path `.venv` and will be ignored; use `--active` to target the active environment instead
+preset          cohort       complete  accuracy/scheduled  scorable  pending  estimated cost
+auto-cost       all          True     0.796/500          446         0      None
+auto-cost       control      True     0.930/100           93         0      None
+auto-cost       separating   True     0.762/400          353         0      None
+auto-balanced   all          True     0.716/500          423         0      None
+auto-balanced   control      True     0.860/100           87         0      None
+auto-balanced   separating   True     0.680/400          336         0      None
+auto-quality    all          True     0.696/500          372         0      None
+auto-quality    control      True     0.780/100           78         0      None
+auto-quality    separating   True     0.675/400          294         0      None
+Deliberately selected routing stress test; not representative or leaderboard score. Independent historical predictions and five-shot protocols maynot transfer to today's deployed models or zero-shot prompts. Controls intentionally dilute aggregate separation. One run per preset and cache reuse cannot establish a general routing advantage or benefit over a fixed-model baseline.
+All-scheduled accuracy counts pending and unscorable questions as not correct; partial-run deltas are provisional. Jointly scorable comparisons exclude operational failures and pending pairs and can select a different population.
+Paired bootstrap intervals are descriptive of this selected subset, not the entire dataset or repeated-run uncertainty; resampling uses immutable question pairs and right-minus-left percentage points.
+Costs are successful generation estimates, not audited bills or total routing cost; they exclude router-side routing decisions, unobserved failed/fallback attempts, infrastructure and local hardware. Latest logical attempts are counted; extra calls may incur additional unreported cost.
+Cost coverage uses all scheduled questions. Incomplete coverage yields only a partial sum, with complete totals and cost-per-correct unknown; missing telemetry is not zero.
+Cached answers are not fresh independent generations. Latency is end-to-end service latency, not uncached model latency. Unknown cache status is not inferred from response IDs. Without a verified cache-hit indicator, cache status and original generation costs may remain unknown.
+Usage totals include only available numeric fields; per-field coverage counts are reported, not imputed. Routing/provider determinism is not guaranteed. Resume may duplicate interrupted in-flight provider work.

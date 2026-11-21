@@ -1,11 +1,13 @@
 
 import pytest
 from pydantic import ValidationError
+from ruamel.yaml import YAML
 
 from gateway.models import ChatCompletionRequest
 from gateway.routing import (
     AUTO_ROUTING_PRESETS,
     fallback_model,
+    get_explicit_models,
     route_request,
 )
 
@@ -139,14 +141,44 @@ def test_unknown_model_alias_is_rejected():
         route_request(request)
 
 
-def test_streaming_is_rejected():
-    with pytest.raises(ValidationError):
-        make_request(stream=True)
+def test_explicit_models_reload_from_litellm_config(monkeypatch, tmp_path):
+    import gateway.routing as routing
+
+    config_path = tmp_path / "config.yaml"
+    yaml = YAML()
+    with config_path.open("w", encoding="utf-8") as stream:
+        yaml.dump({
+            "model_list": [
+                {"model_name": "dynamically-added"},
+            ]
+        }, stream)
+
+    monkeypatch.setattr(routing, "LITELLM_CONFIG_PATH", config_path)
+
+    assert "dynamically-added" in get_explicit_models()
+
+
+def test_streaming_is_supported_by_request_model():
+    request = make_request(stream=True)
+    assert request.stream is True
+
+
+def test_tool_message_role_is_supported():
+    request = ChatCompletionRequest(
+        messages=[
+            {
+                "role": "tool",
+                "content": "{\"temperature\":21}",
+                "tool_call_id": "call-1",
+            }
+        ]
+    )
+    assert request.messages[0].role == "tool"
 
 
 @pytest.mark.parametrize(
     "role",
-    ["developer", "tool", "invalid"],
+    ["developer", "invalid"],
 )
 def test_unsupported_roles_are_rejected(role):
     with pytest.raises(ValidationError):
